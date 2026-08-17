@@ -9,7 +9,8 @@ tags: ["architecture", "overview", "pipeline", "langgraph", "state-machine"]
 
 ## High-Level Architecture
 
-```mermaid
+<!-- openwiki: mermaid parse failed and this diagram was converted to a text fence so it does not break rendering. Fix the diagram source and restore the mermaid fence. Parser error: Heuristic: an unescaped angle bracket inside a label breaks rendering; rephrase the label. -->
+```text
 flowchart TD
     subgraph "Runtime"
         CLI[CLI Entrypoint MISSING]

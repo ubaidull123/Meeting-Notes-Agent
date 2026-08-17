@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-17T08:05:15.918Z",
+  "updatedAt": "2026-08-17T09:34:31.406Z",
   "command": "init",
   "gitHead": "HEAD\nfatal: ambiguous argument 'HEAD': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'git <command> [<revision>...] -- [<file>...]'",
   "model": "@preset/claude-code",

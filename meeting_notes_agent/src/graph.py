@@ -4,6 +4,7 @@ from src.state_schema import MeetingState
 from src.Nodes.i_Input import get_input_node
 from src.Nodes.ii_transcribe_audio import transcribe_audio
 from src.Nodes.iii_clean_transcript import clean_transcript
+from src.Nodes.vi_redaction import redact_sensitive_info
 
 
 def build_graph() -> StateGraph:
@@ -14,12 +15,14 @@ def build_graph() -> StateGraph:
     graph.add_node("TranscribeAudio", transcribe_audio)
     graph.add_node("CleanTranscript", clean_transcript)
     graph.add_node("Summarize", summarize_meeting_notes)
+    graph.add_node("RedactSensitiveInfo", redact_sensitive_info)
 
     graph.add_edge(START, "Input")
     graph.add_edge("Input", "TranscribeAudio")
     graph.add_edge("TranscribeAudio", "CleanTranscript")
     graph.add_edge("CleanTranscript", "Summarize")
-    graph.add_edge("Summarize", END)
+    graph.add_edge("Summarize", "RedactSensitiveInfo")
+    graph.add_edge("RedactSensitiveInfo", END)
 
     return graph
 

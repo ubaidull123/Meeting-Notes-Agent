@@ -43,6 +43,12 @@ class MeetingState(BaseModel):
     decisions: List[str] = Field(default_factory=list)
     action_items: List[str] = Field(default_factory=list)
 
+    # Redacted outputs (PII/confidential info removed)
+    redacted_transcription: Optional[str] = None
+    redacted_summary: Optional[str] = None
+    redacted_decisions: List[str] = Field(default_factory=list)
+    redacted_action_items: List[str] = Field(default_factory=list)
+
     @model_validator(mode="after")
     def validate_input_source(self) -> "MeetingState":
         """Ensure at least one transcript/audio source is provided at entry."""

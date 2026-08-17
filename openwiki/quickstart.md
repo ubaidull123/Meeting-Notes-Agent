@@ -71,6 +71,7 @@ Use this table to navigate from a **change intent** to the relevant wiki page, s
 | Change Intent | Wiki Page | Source Entrypoints | Focused Test / Validation |
 |---------------|-----------|-------------------|---------------------------|
 | **Understand the pipeline** | [architecture/overview.md](architecture/overview.md) | `src/graph.py`, `src/state_schema.py` | `python -m meeting_notes_agent.src.graph` (compiles) |
+<!-- openwiki: broken internal link [configuration.md#missing-entrypoint] heading anchor "missing-entrypoint" does not exist in "configuration.md". Fix the href or restore the target, then delete this comment. -->
 | **Fix the CLI entrypoint** | [configuration.md#missing-entrypoint](configuration.md#missing-entrypoint) | `pyproject.toml`, `meeting_notes_agent/__init__.py` | `pip install -e . && meeting-notes-agent --help` |
 | **Fix invalid model names** | [components/llm-providers.md](components/llm-providers.md) | `src/llms/API_Based/groq.py`, `openai.py`, `openrouter.py` | Set API keys in `.env`, run graph with transcript_text |
 | **Integrate Summarize node** | [architecture/nodes/summarize.md](architecture/nodes/summarize.md) | `src/Nodes/iv_summerize.py`, `src/graph.py` | Mock OpenAI, verify partial dict return preserves state |
@@ -104,6 +105,7 @@ cat .env  # Should have GROQ_API_KEY, OPENAI_API_KEY
 
 ## Current Blockers (Fix These First)
 
+<!-- openwiki: broken internal link [configuration.md#missing-entrypoint] heading anchor "missing-entrypoint" does not exist in "configuration.md". Fix the href or restore the target, then delete this comment. -->
 1. **Entrypoint missing** — `meeting_notes_agent:main` doesn't exist ([configuration.md](configuration.md#missing-entrypoint))
 2. **Invalid model names** — `gpt-5.6-luna` (OpenAI), `""` (Groq LLM), `"whisper"` (Groq Whisper) ([components/llm-providers.md](components/llm-providers.md))
 3. **HF Whisper breaks imports** — eager loading + inference at module level ([components/llm-providers.md](components/llm-providers.md#huggingface-local-whisper))
@@ -129,6 +131,7 @@ cat .env  # Should have GROQ_API_KEY, OPENAI_API_KEY
 | Redaction logic | Zero implementation, heuristic-based | [README-aspiration.md](README-aspiration.md#missing-integrations-all-zero-implementation) |
 | Human-in-the-loop UI | Requires LangGraph interrupts + checkpointer | [README-aspiration.md](README-aspiration.md#missing-infrastructure) |
 | SQLite/Postgres persistence | Empty `postgresdb.py`, no checkpointer in graph | [components/database.md](components/database.md) |
+<!-- openwiki: broken internal link [configuration.md#missing-entrypoint] heading anchor "missing-entrypoint" does not exist in "configuration.md". Fix the href or restore the target, then delete this comment. -->
 | Full CLI with args | No entrypoint, no argument parsing | [configuration.md](configuration.md#missing-entrypoint) |
 
 ---

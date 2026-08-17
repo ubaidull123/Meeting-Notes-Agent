@@ -240,6 +240,7 @@ result = app.invoke(state)
 
 ### CLI (Missing)
 
+<!-- openwiki: broken internal link [/openwiki/configuration.md#missing-entrypoint] heading anchor "missing-entrypoint" does not exist in "/openwiki/configuration.md". Fix the href or restore the target, then delete this comment. -->
 No CLI entrypoint exists. See [Configuration](/openwiki/configuration.md#missing-entrypoint).
 
 ## Adding Nodes (Extension Pattern)
