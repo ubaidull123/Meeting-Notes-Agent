@@ -1,10 +1,10 @@
 from langgraph.graph import StateGraph, START, END
-from meeting_notes_agent.src.Nodes.iv_summerize import summarize_meeting_notes
-from src.state_schema import MeetingState
-from src.Nodes.i_Input import get_input_node
-from src.Nodes.ii_transcribe_audio import transcribe_audio
-from src.Nodes.iii_clean_transcript import clean_transcript
-from src.Nodes.vi_redaction import redact_sensitive_info
+from meeting_notes_agent.Nodes.iv_summerize import summarize_meeting_notes
+from meeting_notes_agent.state_schema import MeetingState
+from meeting_notes_agent.Nodes.i_Input import get_input_node
+from meeting_notes_agent.Nodes.ii_transcribe_audio import transcribe_audio
+from meeting_notes_agent.Nodes.iii_clean_transcript import clean_transcript
+from meeting_notes_agent.Nodes.vi_redaction import redact_sensitive_info
 
 
 def build_graph() -> StateGraph:

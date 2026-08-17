@@ -1,5 +1,6 @@
-from src.state_schema import MeetingState
-from src.llms.API_Based.openai import get_openai_llm
+from meeting_notes_agent.llms.prompts.redaction_prompt import REDACTION
+from meeting_notes_agent.state_schema import MeetingState
+from meeting_notes_agent.llms.API_Based.openai import get_openai_llm
 
 llm = get_openai_llm()
 
@@ -42,30 +43,7 @@ def redact_sensitive_info(state: MeetingState) -> dict:
 
     full_content = "\n\n".join(content_parts)
 
-    system_prompt = (
-        "You are a data privacy specialist. Redact sensitive information from the "
-        "provided meeting content while preserving the overall meaning and structure.\n\n"
-        "REDACT the following types of information (replace with [REDACTED]):\n"
-        "1. Person names (first, last, full names)\n"
-        "2. Email addresses\n"
-        "3. Phone numbers (including extensions)\n"
-        "4. Physical addresses (street, city, state, zip, country)\n"
-        "4. Financial data: credit card numbers, bank account numbers, routing numbers\n"
-        "5. Government IDs: SSN, passport numbers, driver's license numbers, tax IDs\n"
-        "6. Authentication credentials: passwords, API keys, tokens, secrets\n"
-        "7. Confidential project codenames or internal references\n"
-        "8. Medical/health information (HIPAA)\n"
-        "9. Legal case numbers or privileged information\n"
-        "10. IP addresses and MAC addresses\n\n"
-        "PRESERVE:\n"
-        "- General business terms, department names, public project names\n"
-        "- Dates, times, durations (unless tied to specific sensitive events)\n"
-        "- Monetary amounts without account context\n"
-        "- Action items, decisions, and summary structure\n\n"
-        "Return the redacted content in the SAME format with the same section headers. "
-        "Each section should start with its header (e.g., '=== TRANSCRIPTION ===')."
-    )
-
+    system_prompt = REDACTION
     messages = [
         ("system", system_prompt),
         ("human", full_content),

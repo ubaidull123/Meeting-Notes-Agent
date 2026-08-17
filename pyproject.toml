@@ -1,7 +1,7 @@
 [project]
 name = "meeting-notes-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Meeting notes agent with transcription, summarization, and redaction"
 readme = "README.md"
 authors = [
     { name = "Ubaidullah Saeed", email = "ubaidullahsaeed2006@gmail.com" }
@@ -16,12 +16,16 @@ dependencies = [
     "langchain-openai>=1.4.3",
     "langchain-openrouter>=0.2.7",
     "langgraph>=1.2.11",
+    "langgraph-checkpoint-postgres>=3.1.2",
     "pydantic>=2.12.5",
 ]
 
 [project.scripts]
-meeting-notes-agent = "meeting_notes_agent:main"
+meeting-notes-agent = "meeting_notes_agent.graph:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+meeting-notes-agent = { path = "src/meeting_notes_agent", editable = true }

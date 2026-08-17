@@ -1,8 +1,8 @@
 """
 Backward-compatibility shim — re-exports from state_schema.
-New code should import directly from src.state_schema.
+New code should import directly from meeting_notes_agent.state_schema.
 """
-from src.state_schema import (
+from meeting_notes_agent.state_schema import (
     Attendee,
     MeetingState as MeetingData,
     MeetingState,

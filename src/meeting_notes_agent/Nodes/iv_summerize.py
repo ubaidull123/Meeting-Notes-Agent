@@ -1,5 +1,6 @@
-from src.state_schema import MeetingState
-from src.llms.API_Based.openai import get_openai_llm
+from meeting_notes_agent.llms.prompts.summarize_prompt import SUMMRIZE
+from meeting_notes_agent.state_schema import MeetingState
+from meeting_notes_agent.llms.API_Based.openai import get_openai_llm
 
 llm = get_openai_llm()
 
@@ -18,20 +19,7 @@ def summarize_meeting_notes(state: MeetingState) -> dict:
     if not transcript.strip():
         return {"summary": "", "decisions": [], "action_items": []}
 
-    system_prompt = (
-        "You are a meeting notes summarizer. Given a cleaned meeting transcript, "
-        "produce a structured summary with the following sections:\n\n"
-        "## Summary\n"
-        "A concise paragraph (3-5 sentences) capturing the meeting's purpose, "
-        "key discussion points, and outcomes.\n\n"
-        "## Decisions Made\n"
-        "Explicit decisions reached during the meeting. Each on a new line prefixed with '- '.\n"
-        "If no decisions were made, write 'None'.\n\n"
-        "## Action Items\n"
-        "Specific tasks assigned with owner and due date if mentioned. "
-        "Each on a new line prefixed with '- '. If none, write 'None'.\n\n"
-        "Return ONLY the structured summary with these three sections, nothing else."
-    )
+    system_prompt = SUMMRIZE
 
     messages = [
         ("system", system_prompt),

@@ -1,4 +1,4 @@
-from src.state_schema import MeetingState, validate_audio_path, validate_transcript_path
+from meeting_notes_agent.state_schema import MeetingState, validate_audio_path, validate_transcript_path
 
 
 def get_input_node(state: MeetingState) -> MeetingState:

@@ -1,5 +1,5 @@
-from src.state_schema import MeetingState
-from src.llms.API_Based.openai import get_openai_llm
+from meeting_notes_agent.state_schema import MeetingState
+from meeting_notes_agent.llms.API_Based.openai import get_openai_llm
 
 
 llm = get_openai_llm()

@@ -1,5 +1,5 @@
-from src.state_schema import MeetingState
-from src.llms.API_Based.groq import get_groq_whisper_llm
+from meeting_notes_agent.state_schema import MeetingState
+from meeting_notes_agent.llms.API_Based.groq import get_groq_whisper_llm
 
 
 llm = get_groq_whisper_llm()
