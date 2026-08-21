@@ -81,6 +81,12 @@ class User(Base):
     quotas = relationship("UserQuota", back_populates="user", uselist=False, cascade="all, delete-orphan")
     credits = relationship("UserCredits", back_populates="user", uselist=False, cascade="all, delete-orphan")
     usage_records = relationship("UserUsage", back_populates="user", cascade="all, delete-orphan")
+    ai_config = relationship("UserAIConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    credentials = relationship("UserCredential", back_populates="user", cascade="all, delete-orphan")
+    email_config = relationship("UserEmailConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    credit_transactions = relationship("CreditTransaction", backref="user", lazy="dynamic")
+    usage_records_new = relationship("UsageRecord", backref="user", lazy="dynamic")
+    ai_overrides = relationship("MeetingAIOverride", back_populates="user", lazy="dynamic")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email='{self.email}', role='{self.role.value}')>"
@@ -180,6 +186,7 @@ class Meeting(Base):
     user = relationship("User", back_populates="meetings")
     attendees = relationship("Attendee", back_populates="meeting", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="meeting", cascade="all, delete-orphan")
+    ai_override = relationship("MeetingAIOverride", back_populates="meeting", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_meetings_user_date", "user_id", "meeting_date"),
