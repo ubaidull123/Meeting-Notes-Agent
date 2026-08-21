@@ -5,6 +5,7 @@ import time
 from email.utils import parseaddr
 from html import escape
 from typing import List, Optional, Any, Dict
+from urllib.parse import urlencode
 
 import httpx
 
@@ -137,7 +138,11 @@ def _send_via_mailgun(
     response = httpx.post(
         endpoint,
         auth=("api", settings.mailgun_api_key or ""),
-        data=fields,
+        # httpx does not consistently encode a sequence of repeated form keys
+        # on every supported version. Encode it explicitly so each recipient is
+        # sent as a separate `to` field, as expected by Mailgun.
+        content=urlencode(fields).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
         timeout=30.0,
     )
     if response.status_code >= 400:
