@@ -74,6 +74,12 @@ class Settings(BaseSettings):
         alias="LANGGRAPH_CHECKPOINT_DB",
     )
 
+    # Credential Encryption (AES-GCM with HKDF-SHA256 key derivation)
+    credential_encryption_key: str = Field(
+        default="dev-master-key-change-in-production-32bytes",
+        alias="CREDENTIAL_ENCRYPTION_KEY"
+    )
+
     @computed_field
     @property
     def cors_origins(self) -> List[str]:
