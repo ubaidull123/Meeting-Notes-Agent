@@ -115,6 +115,8 @@ def test_byok_resolution_requires_key_and_does_not_spend_app_credits(db_session,
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="BYOK meeting",
         meeting_date=date.today(),
         transcript_text="Transcript",
@@ -140,6 +142,8 @@ def test_app_credit_processing_deducts_and_logs_usage(db_session, test_user):
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Credit meeting",
         meeting_date=date.today(),
         transcript_text="Transcript",
@@ -170,6 +174,8 @@ def test_insufficient_app_credits_blocks_cleanly(db_session, test_user):
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Blocked meeting",
         meeting_date=date.today(),
         transcript_text="Transcript",

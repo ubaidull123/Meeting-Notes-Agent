@@ -46,6 +46,8 @@ def test_human_review_persists_checkpoint_and_rejects_cleanly(db_session, test_u
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Review flow",
         meeting_date=date.today(),
         transcript_text="A valid input transcript.",
@@ -78,6 +80,8 @@ def test_queue_processing_returns_before_graph_execution(db_session, test_user):
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Queued flow",
         meeting_date=date.today(),
         transcript_text="A valid input transcript.",
@@ -133,6 +137,8 @@ def test_cancelled_meeting_stops_graph_nodes(db_session, test_user):
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Cancellation flow",
         meeting_date=date.today(),
         transcript_text="A valid input transcript.",

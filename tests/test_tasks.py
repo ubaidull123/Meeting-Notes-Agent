@@ -71,6 +71,8 @@ class TestTaskEndpoints:
         meeting = Meeting(
             id=uuid4(),
             user_id=test_user.id,
+            team_id=test_user.team_memberships[0].team_id,
+            created_by=test_user.id,
             title="Task Sync Meeting",
             meeting_date=date.today(),
             transcript_text="Transcript",
@@ -94,6 +96,8 @@ class TestTaskEndpoints:
         meeting = Meeting(
             id=uuid4(),
             user_id=test_user.id,
+            team_id=test_user.team_memberships[0].team_id,
+            created_by=test_user.id,
             title="Task Update Meeting",
             meeting_date=date.today(),
             transcript_text="Transcript",

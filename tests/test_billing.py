@@ -26,6 +26,8 @@ def test_terminal_meeting_charges_once_and_updates_usage(db_session, test_user):
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Billing test",
         meeting_date=date.today(),
         transcript_text="Transcript",
@@ -60,6 +62,8 @@ def test_rejected_and_cancelled_meetings_spend_credit(db_session, test_user, ter
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title=f"{terminal_status.value} billing test",
         meeting_date=date.today(),
         transcript_text="Transcript",

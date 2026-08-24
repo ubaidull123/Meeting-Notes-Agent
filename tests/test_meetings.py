@@ -292,6 +292,8 @@ class TestMeetingOwnership:
         other_meeting = Meeting(
             id=uuid4(),
             user_id=admin_user.id,
+            team_id=admin_user.team_memberships[0].team_id,
+            created_by=admin_user.id,
             title="Other User's Meeting",
             meeting_date=date.today(),
             transcript_text="Other transcript",
@@ -314,6 +316,8 @@ class TestMeetingOwnership:
         other_meeting = Meeting(
             id=uuid4(),
             user_id=admin_user.id,
+            team_id=admin_user.team_memberships[0].team_id,
+            created_by=admin_user.id,
             title="Other User's Meeting",
             meeting_date=date.today(),
             transcript_text="Other transcript",

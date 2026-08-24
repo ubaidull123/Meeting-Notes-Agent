@@ -8,6 +8,8 @@ import { meetingsApi } from './api/meetings';
 import { MeetingReviewPage, shouldPollMeetingStatus } from './reviewMeetingPage';
 import { Meeting } from './types/meeting';
 
+const roleState = vi.hoisted(() => ({ canManage: true }));
+
 vi.mock('./api/meetings', () => ({
   meetingsApi: {
     getMeeting: vi.fn(),
@@ -23,11 +25,34 @@ vi.mock('./api/meetings', () => ({
   },
 }));
 
+vi.mock('./context/TeamContext', () => ({
+  useTeam: () => ({
+    activeTeam: { id: 'team-1', role: 'owner' },
+    canManageTeam: () => roleState.canManage,
+  }),
+}));
+
+vi.mock('./context/AuthContext', () => ({
+  useAuth: () => ({
+    user: {
+      id: 1,
+      email: 'owner@example.com',
+      full_name: 'Team Owner',
+      role: 'USER',
+      platform_role: 'user',
+      is_active: true,
+    },
+  }),
+}));
+
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const meeting = {
   id: 'meeting-1',
   user_id: 1,
+  team_id: 'team-1',
+  project_id: 'project-1',
+  created_by: 1,
   title: 'Planning review',
   meeting_date: '2026-08-20',
   project_name: 'Launch',
@@ -61,6 +86,7 @@ function renderPage() {
 
 describe('MeetingReviewPage', () => {
   beforeEach(() => {
+    roleState.canManage = true;
     vi.mocked(meetingsApi.getMeeting).mockResolvedValue(meeting);
     vi.mocked(meetingsApi.getStatus).mockResolvedValue({
       meeting_id: meeting.id,
@@ -103,6 +129,18 @@ describe('MeetingReviewPage', () => {
 
     expect(await screen.findByRole('heading', { name: /email draft review/i })).toBeInTheDocument();
     expect(screen.getByText(/approved next steps/i)).toBeInTheDocument();
+  });
+
+  it('does not expose meeting-management controls to a normal member', async () => {
+    roleState.canManage = false;
+    renderPage();
+
+    expect(await screen.findByText('Planning review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^edit meeting$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /review email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /stop processing/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /transcript/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /activity/i })).not.toBeInTheDocument();
   });
 
   it('confirms and submits a stop-processing request', async () => {
