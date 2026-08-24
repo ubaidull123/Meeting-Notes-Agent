@@ -1366,6 +1366,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "bcrypt" },
+    { name = "cryptography" },
     { name = "dotenv" },
     { name = "email-validator" },
     { name = "fastapi" },
@@ -1408,6 +1409,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bcrypt", specifier = ">=4.0.0" },
+    { name = "cryptography", specifier = ">=42.0.0" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "email-validator", specifier = ">=2.2.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
