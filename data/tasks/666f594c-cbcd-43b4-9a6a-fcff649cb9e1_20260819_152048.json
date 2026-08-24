@@ -1,0 +1,48 @@
+{
+  "meeting_id": "666f594c-cbcd-43b4-9a6a-fcff649cb9e1",
+  "meeting_title": "Test Meeting",
+  "tasks": [
+    {
+      "id": "dafdae7a",
+      "title": "Jane: Prepare the mockups by Wednesday.",
+      "description": "Jane: Prepare the mockups by Wednesday.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "666f594c-cbcd-43b4-9a6a-fcff649cb9e1",
+      "meeting_title": "Test Meeting",
+      "action_item_index": 0,
+      "created_at": "2026-08-19T15:20:48.365071",
+      "updated_at": "2026-08-19T15:20:48.365073",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    },
+    {
+      "id": "02169e01",
+      "title": "John: Review the backend API by Thursday.",
+      "description": "John: Review the backend API by Thursday.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "666f594c-cbcd-43b4-9a6a-fcff649cb9e1",
+      "meeting_title": "Test Meeting",
+      "action_item_index": 1,
+      "created_at": "2026-08-19T15:20:48.365131",
+      "updated_at": "2026-08-19T15:20:48.365132",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    }
+  ],
+  "created_at": "2026-08-19T15:20:48.365356",
+  "synced_at": null
+}

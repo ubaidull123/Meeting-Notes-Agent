@@ -5,8 +5,8 @@ from enum import Enum as PyEnum
 from typing import Optional
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint,
-    func, JSON, Enum as SQLEnum, Boolean
+    Boolean, Column, DateTime, Float, ForeignKey, Integer, JSON, String, Text,
+    UniqueConstraint, func, Enum as SQLEnum,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
@@ -89,6 +89,65 @@ class UserEmailConfig(Base):
     smtp_use_tls = Column(Boolean, default=True, nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     user = relationship("User", back_populates="email_config")
+
+
+class UserProductSettings(Base):
+    """Product preferences that do not belong in provider or billing tables."""
+
+    __tablename__ = "user_product_settings"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+    # Profile and locale preferences.
+    timezone = Column(String(100), default="UTC", nullable=False)
+    language = Column(String(10), default="en", nullable=False)
+    date_format = Column(String(20), default="yyyy-mm-dd", nullable=False)
+    time_format = Column(String(10), default="12h", nullable=False)
+    organization = Column(String(255), nullable=True)
+    job_title = Column(String(255), nullable=True)
+
+    # Provider-independent AI and transcription controls.
+    ai_temperature = Column(Float, default=0.2, nullable=False)
+    ai_max_output_tokens = Column(Integer, default=1200, nullable=False)
+    response_language = Column(String(50), default="auto", nullable=False)
+    transcription_language = Column(String(20), default="auto", nullable=False)
+
+    # Meeting processing defaults.
+    default_meeting_type = Column(String(50), default="general", nullable=False)
+    generate_summary = Column(Boolean, default=True, nullable=False)
+    generate_action_items = Column(Boolean, default=True, nullable=False)
+    generate_decisions = Column(Boolean, default=True, nullable=False)
+    generate_insights = Column(Boolean, default=True, nullable=False)
+    generate_follow_up_email = Column(Boolean, default=True, nullable=False)
+    require_human_review = Column(Boolean, default=True, nullable=False)
+    require_email_approval = Column(Boolean, default=True, nullable=False)
+    redact_sensitive_information = Column(Boolean, default=True, nullable=False)
+    summary_style = Column(String(30), default="standard", nullable=False)
+    summary_sections = Column(
+        JSON,
+        default=lambda: ["main_topics", "decisions", "action_items", "deadlines"],
+        nullable=False,
+    )
+    custom_instructions = Column(Text, nullable=True)
+
+    # Notification preferences. Delivery infrastructure is intentionally separate.
+    notify_processing_finished = Column(Boolean, default=True, nullable=False)
+    notify_processing_failed = Column(Boolean, default=True, nullable=False)
+    notify_review_required = Column(Boolean, default=True, nullable=False)
+    notify_email_approval_required = Column(Boolean, default=True, nullable=False)
+    notify_credits_low = Column(Boolean, default=True, nullable=False)
+
+    # Data handling policy. Enforcement workers can consume these values later.
+    recording_retention = Column(String(20), default="never", nullable=False)
+    keep_transcript = Column(Boolean, default=True, nullable=False)
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    user = relationship("User", back_populates="product_settings")
 
 
 class CreditTransaction(Base):

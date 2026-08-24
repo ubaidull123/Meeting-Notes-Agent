@@ -1,0 +1,28 @@
+{
+  "meeting_id": "34e1ab3a-6892-4444-a020-f8670577aef6",
+  "meeting_title": "Approval verification",
+  "tasks": [
+    {
+      "id": "e3f2e313",
+      "title": "None.",
+      "description": "None.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "34e1ab3a-6892-4444-a020-f8670577aef6",
+      "meeting_title": "Approval verification",
+      "action_item_index": 0,
+      "created_at": "2026-08-20T18:14:34.982507",
+      "updated_at": "2026-08-20T18:14:34.982509",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    }
+  ],
+  "created_at": "2026-08-20T18:14:34.982525",
+  "synced_at": null
+}

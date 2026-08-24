@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool, StaticPool
 
-from meeting_notes_agent.core.config import settings
+from meeting_notes_agent.config.core.config import settings
 from meeting_notes_agent.database.models import Base, User, UserCredits, UserQuota
 
 

@@ -12,7 +12,7 @@ from meeting_notes_agent.schemas.task import (
     TaskListResponse,
 )
 from meeting_notes_agent.services import TaskService
-from meeting_notes_agent.core.exceptions import NotFoundError, ValidationError
+from meeting_notes_agent.config.core.exceptions import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 

@@ -19,7 +19,7 @@ from meeting_notes_agent.database.models import (
     TaskStatus,
     TaskPriority,
 )
-from meeting_notes_agent.core.exceptions import NotFoundError, ConflictError
+from meeting_notes_agent.config.core.exceptions import NotFoundError, ConflictError
 
 
 class UserRepository:

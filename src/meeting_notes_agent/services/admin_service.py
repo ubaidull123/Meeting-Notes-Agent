@@ -14,7 +14,7 @@ from meeting_notes_agent.database import (
     get_db,
 )
 from meeting_notes_agent.database.models import UserRole, MeetingStatus, User
-from meeting_notes_agent.core.exceptions import NotFoundError, ValidationError
+from meeting_notes_agent.config.core.exceptions import NotFoundError, ValidationError
 from meeting_notes_agent.schemas.admin import (
     AdminStatsResponse,
     AdminUserListItem,

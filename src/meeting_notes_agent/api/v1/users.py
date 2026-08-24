@@ -14,7 +14,7 @@ from meeting_notes_agent.schemas.user import (
 from meeting_notes_agent.schemas.auth import ChangePasswordRequest
 from meeting_notes_agent.schemas.admin import AdminUserListItem, AdminUserDetail, AdminUserUpdate
 from meeting_notes_agent.services import AuthService, AdminService
-from meeting_notes_agent.core.exceptions import NotFoundError, ValidationError, AuthenticationError
+from meeting_notes_agent.config.core.exceptions import NotFoundError, ValidationError, AuthenticationError
 
 router = APIRouter(prefix="/users", tags=["Users"])
 

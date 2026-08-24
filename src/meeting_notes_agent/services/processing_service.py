@@ -20,7 +20,7 @@ from meeting_notes_agent.database import (
     get_db,
 )
 from meeting_notes_agent.database.models import Meeting, MeetingStatus, Task, TaskStatus, TaskPriority
-from meeting_notes_agent.core.exceptions import (
+from meeting_notes_agent.config.core.exceptions import (
     InsufficientCreditsError,
     NotFoundError,
     ProcessingCancelled,
@@ -28,6 +28,11 @@ from meeting_notes_agent.core.exceptions import (
     QuotaExceededError,
     ValidationError,
 )
+from meeting_notes_agent.database.models_ai_config import AIUsageMode
+from meeting_notes_agent.services.ai_settings_service import AISettingsService
+from meeting_notes_agent.services.credits_service import CreditsService
+from meeting_notes_agent.services.meeting_override_service import MeetingOverrideService
+from meeting_notes_agent.services.configuration_resolver import UserConfigurationResolver
 from meeting_notes_agent.schemas.meeting import (
     MeetingCreate,
     MeetingUpdate,
@@ -70,7 +75,7 @@ class ProcessingService:
             self._graph = build_graph()
         return self._graph
 
-    def _map_meeting_to_state(self, meeting: Meeting) -> MeetingState:
+    def _map_meeting_to_state(self, meeting: Meeting, db=None) -> MeetingState:
         """Map database meeting to MeetingState."""
         attendees = [
             Attendee(name=a.name, email=a.email)
@@ -88,6 +93,7 @@ class ProcessingService:
         elif transcript_file_path:
             transcript_text = None
 
+        configuration = UserConfigurationResolver(db or self._get_db()).resolve(meeting.user_id, meeting.id)
         state = MeetingState(
             meeting_id=str(meeting.id),
             user_id=meeting.user_id,
@@ -95,6 +101,7 @@ class ProcessingService:
             meeting_date=meeting.meeting_date,
             meeting_time=meeting.meeting_time,
             project_name=meeting.project_name,
+            configuration=configuration,
             audio_file_path=audio_file_path,
             transcript_file_path=transcript_file_path,
             transcript_text=transcript_text,
@@ -223,7 +230,7 @@ class ProcessingService:
         )
 
     @staticmethod
-    def _ensure_processing_allowance(db, user_id: int) -> None:
+    def _ensure_processing_allowance(db, user_id: int, meeting: Meeting | None = None) -> None:
         """Initialize monthly billing records and enforce limits before work starts."""
         quota_repo = UserQuotaRepository(db)
         credits_repo = UserCreditsRepository(db)
@@ -251,10 +258,22 @@ class ProcessingService:
                     "used": current_usage.meetings_processed,
                 },
             )
-        if credits.balance <= 0:
+        required_credits = 1
+        if meeting is not None:
+            override = MeetingOverrideService(db).to_dict(meeting.id, user_id)
+            ai_service = AISettingsService(db)
+            llm_config = ai_service.resolve_llm_config(user_id, override)
+            transcription_config = ai_service.resolve_transcription_config(user_id, override)
+            required_credits = 0
+            if llm_config["usage_mode"] == AIUsageMode.APP_CREDITS.value:
+                required_credits += 1
+            if meeting.audio_file_path and transcription_config["usage_mode"] == AIUsageMode.APP_CREDITS.value:
+                required_credits += 1
+
+        if required_credits and credits.balance < required_credits:
             raise InsufficientCreditsError(
-                "Insufficient credits. Please contact an administrator.",
-                details={"balance": credits.balance},
+                "You do not have enough credits to process this meeting.",
+                details={"balance": credits.balance, "required": required_credits},
             )
 
     @staticmethod
@@ -264,14 +283,67 @@ class ProcessingService:
             return
 
         usage_repo = UserUsageRepository(db)
-        credits_repo = UserCreditsRepository(db)
         usage = usage_repo.get_or_create_current_month(meeting.user_id)
 
-        credits = credits_repo.get_or_create(meeting.user_id)
-        credits_repo.deduct_credits(credits, 1, "Meeting processing")
+        override = MeetingOverrideService(db).to_dict(meeting.id, meeting.user_id)
+        ai_service = AISettingsService(db)
+        credits_service = CreditsService(db)
+        credits_service.get_balance(meeting.user_id)
+        llm_config = ai_service.resolve_llm_config(meeting.user_id, override)
+        transcription_config = ai_service.resolve_transcription_config(meeting.user_id, override)
+
+        credits_spent = 0
+        if llm_config["usage_mode"] == AIUsageMode.APP_CREDITS.value:
+            credits_service.deduct_credits(
+                meeting.user_id,
+                1,
+                meeting_id=meeting.id,
+                service_type="llm",
+                provider=llm_config["provider"],
+                model=llm_config["model"],
+                usage_mode=llm_config["usage_mode"],
+                description="Meeting LLM processing",
+                usage_metadata={"tokens_used": meeting.tokens_used or 0},
+            )
+            credits_spent += 1
+        credits_service.record_usage(
+            meeting.user_id,
+            meeting.id,
+            service_type="llm",
+            provider=llm_config["provider"],
+            model=llm_config["model"],
+            usage_mode=llm_config["usage_mode"],
+            input_tokens=meeting.tokens_used or 0,
+            credits_cost=1 if llm_config["usage_mode"] == AIUsageMode.APP_CREDITS.value else 0,
+        )
+
+        if meeting.audio_file_path:
+            if transcription_config["usage_mode"] == AIUsageMode.APP_CREDITS.value:
+                credits_service.deduct_credits(
+                    meeting.user_id,
+                    1,
+                    meeting_id=meeting.id,
+                    service_type="transcription",
+                    provider=transcription_config["provider"],
+                    model=transcription_config["model"],
+                    usage_mode=transcription_config["usage_mode"],
+                    description="Meeting transcription",
+                    usage_metadata={},
+                )
+                credits_spent += 1
+            credits_service.record_usage(
+                meeting.user_id,
+                meeting.id,
+                service_type="transcription",
+                provider=transcription_config["provider"],
+                model=transcription_config["model"],
+                usage_mode=transcription_config["usage_mode"],
+                credits_cost=1 if transcription_config["usage_mode"] == AIUsageMode.APP_CREDITS.value else 0,
+            )
+
         usage.meetings_processed += 1
         usage.tokens_used += meeting.tokens_used or 0
-        usage.credits_consumed += 1
+        usage.credits_consumed += credits_spent
         usage.updated_at = datetime.now(timezone.utc)
         meeting.credits_charged = True
 
@@ -335,10 +407,6 @@ class ProcessingService:
         if not meeting:
             raise NotFoundError("Meeting not found")
 
-        # Only allow updates if in draft or uploaded state
-        if meeting.status not in [MeetingStatus.DRAFT, MeetingStatus.UPLOADED]:
-            raise ValidationError(f"Cannot update meeting in {meeting.status.value} state")
-
         update_data = data.model_dump(exclude_unset=True)
         attendees_data = update_data.pop("attendees", None)
 
@@ -350,7 +418,7 @@ class ProcessingService:
             if len(attendees_data) == 0:
                 raise ValidationError("At least one attendee is required")
             attendee_repo.delete_by_meeting_id(meeting.id)
-            attendee_repo.create_batch(meeting.id, [a.model_dump() for a in attendees_data])
+            attendee_repo.create_batch(meeting.id, attendees_data)
 
         db.commit()
         db.refresh(meeting)
@@ -432,7 +500,7 @@ class ProcessingService:
         if not any([meeting.audio_file_path, meeting.transcript_file_path, meeting.transcript_text]):
             raise ValidationError("No input source provided. Upload audio, transcript file, or provide transcript text.")
 
-        self._ensure_processing_allowance(db, user_id)
+        self._ensure_processing_allowance(db, user_id, meeting)
 
         # Failed processing is safe to retry: discard its terminal error and
         # execute a new graph run with a fresh checkpoint thread.
@@ -477,7 +545,7 @@ class ProcessingService:
             meeting_repo.update(meeting, status=MeetingStatus.PROCESSING)
             db.commit()
 
-            state = self._map_meeting_to_state(meeting)
+            state = self._map_meeting_to_state(meeting, db)
             config = {"configurable": {"thread_id": thread_id}}
 
             # Invoke the graph
@@ -777,7 +845,9 @@ class ProcessingService:
         if not meeting:
             raise NotFoundError("Meeting not found")
 
-        # Map status to stage
+        # Map persisted workflow status to a stable, user-facing stage. During
+        # processing, existing transcript artifacts distinguish transcription
+        # from downstream AI analysis without inventing timer-based progress.
         stage_map = {
             MeetingStatus.QUEUED: "queued",
             MeetingStatus.PROCESSING: "processing",
@@ -790,10 +860,28 @@ class ProcessingService:
             MeetingStatus.CANCELLED: "cancelled",
         }
 
+        current_stage = stage_map.get(meeting.status)
+        if meeting.status == MeetingStatus.PROCESSING:
+            current_stage = (
+                "transcription"
+                if meeting.audio_file_path and not (meeting.raw_transcription or meeting.cleaned_transcription)
+                else "ai_analysis"
+            )
+        elif meeting.status == MeetingStatus.FAILED:
+            error_hint = (meeting.error_code or "").lower()
+            if "email" in error_hint:
+                current_stage = "email"
+            elif "review" in error_hint:
+                current_stage = "human_review"
+            elif meeting.audio_file_path and not (meeting.raw_transcription or meeting.cleaned_transcription):
+                current_stage = "transcription"
+            else:
+                current_stage = "ai_analysis"
+
         return MeetingStatusResponse(
             meeting_id=meeting.id,
             status=meeting.status.value if hasattr(meeting.status, 'value') else meeting.status,
-            current_stage=stage_map.get(meeting.status),
+            current_stage=current_stage,
             error=meeting.error_message,
             progress_percentage=self._calculate_progress(meeting.status),
         )

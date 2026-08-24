@@ -11,5 +11,4 @@ from meeting_notes_agent.state_schema import (
     AudioFormat,
 )
 
-# Legacy alias for MeetingInput (was separate model, now same as MeetingState)
 MeetingInput = MeetingState

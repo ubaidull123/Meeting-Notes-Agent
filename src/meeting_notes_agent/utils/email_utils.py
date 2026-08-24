@@ -1,5 +1,6 @@
 """Email utility functions for reliable Mailgun or Resend delivery."""
 import random
+import os
 import resend
 import time
 from email.utils import parseaddr
@@ -9,7 +10,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from meeting_notes_agent.core.config import Settings
+from meeting_notes_agent.config.core.config import Settings
 
 MAX_SEND_ATTEMPTS = 3
 
@@ -40,10 +41,11 @@ def _is_retryable_error(error: Exception) -> bool:
     return any(marker in message for marker in ("timeout", "timed out", "connection", "temporar", "rate limit", "server error"))
 
 
-def _configured_resend_sender(from_email: Optional[str]) -> tuple[str, Optional[str]]:
+def _configured_resend_sender(from_email: Optional[str], api_key: Optional[str] = None) -> tuple[str, Optional[str]]:
     """Load Resend credentials and sender at call time."""
     current_settings = Settings()
-    if not current_settings.resend_api_key:
+    selected_api_key = api_key or current_settings.resend_api_key
+    if not selected_api_key:
         raise EmailDeliveryError(
             "RESEND_API_KEY is not configured.",
             attempts=0,
@@ -61,27 +63,34 @@ def _configured_resend_sender(from_email: Optional[str]) -> tuple[str, Optional[
 
     # The SDK stores the key globally, so refresh it immediately before every
     # request. This supports key rotation without restarting the API process.
-    resend.api_key = current_settings.resend_api_key
+    resend.api_key = selected_api_key
     return sender, current_settings.resend_test_recipient
 
 
-def _configured_mailgun_sender(from_email: Optional[str]) -> tuple[Settings, str]:
+def _configured_mailgun_sender(
+    from_email: Optional[str],
+    api_key_override: Optional[str] = None,
+    provider_config: Optional[Dict[str, str]] = None,
+) -> tuple[Settings, str, str, str, str]:
     """Load Mailgun configuration and construct a valid sender."""
     current_settings = Settings()
-    if not current_settings.mailgun_api_key:
+    api_key = api_key_override or current_settings.mailgun_api_key
+    domain = (provider_config or {}).get("domain") or current_settings.mailgun_domain
+    base_url = (provider_config or {}).get("base_url") or current_settings.mailgun_base_url
+    if not api_key:
         raise EmailDeliveryError("MAILGUN_API_KEY is not configured.", attempts=0, retryable=False)
-    if not current_settings.mailgun_domain:
+    if not domain:
         raise EmailDeliveryError("MAILGUN_DOMAIN is not configured.", attempts=0, retryable=False)
 
     sender = (
         from_email
         or current_settings.mailgun_from_email
-        or f"Meeting Notes <postmaster@{current_settings.mailgun_domain}>"
+        or f"Meeting Notes <postmaster@{domain}>"
     ).strip()
     _, sender_address = parseaddr(sender)
     if not sender_address or "@" not in sender_address:
         raise EmailDeliveryError("MAILGUN_FROM_EMAIL must contain a valid sender address.", attempts=0, retryable=False)
-    return current_settings, sender
+    return current_settings, sender, api_key, domain, base_url
 
 
 def _validate_test_domain_recipients(
@@ -121,6 +130,10 @@ def _send_via_mailgun(
     cc: Optional[List[str]],
     bcc: Optional[List[str]],
     text: Optional[str],
+    api_key: Optional[str] = None,
+    domain: Optional[str] = None,
+    base_url: Optional[str] = None,
+    reply_to: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Send one Mailgun API request using HTTP Basic authentication."""
     fields: List[tuple[str, str]] = [
@@ -133,11 +146,14 @@ def _send_via_mailgun(
     fields.extend(("bcc", address) for address in bcc or [])
     if text:
         fields.append(("text", text))
+    if reply_to:
+        fields.append(("h:Reply-To", reply_to))
 
-    endpoint = f"{settings.mailgun_base_url.rstrip('/')}/v3/{settings.mailgun_domain}/messages"
+    selected_domain = domain or settings.mailgun_domain
+    endpoint = f"{(base_url or settings.mailgun_base_url).rstrip('/')}/v3/{selected_domain}/messages"
     response = httpx.post(
         endpoint,
-        auth=("api", settings.mailgun_api_key or ""),
+        auth=("api", api_key or settings.mailgun_api_key or ""),
         # httpx does not consistently encode a sequence of repeated form keys
         # on every supported version. Encode it explicitly so each recipient is
         # sent as a separate `to` field, as expected by Mailgun.
@@ -151,7 +167,7 @@ def _send_via_mailgun(
         except ValueError:
             detail = response.text
         hint = ""
-        if settings.mailgun_domain.startswith("sandbox") and response.status_code == 400:
+        if selected_domain.startswith("sandbox") and response.status_code == 400:
             hint = " Mailgun sandbox domains can only send to authorized, verified recipients."
         raise ProviderResponseError(
             f"Mailgun rejected the email ({response.status_code}): {detail}.{hint}",
@@ -171,6 +187,10 @@ def send_email(
     cc: Optional[List[str]] = None,
     bcc: Optional[List[str]] = None,
     text: Optional[str] = None,
+    provider_override: Optional[str] = None,
+    api_key_override: Optional[str] = None,
+    provider_config: Optional[Dict[str, str]] = None,
+    reply_to: Optional[str] = None,
 ) -> Any:
     """
     Send an email using the configured provider (Mailgun or Resend).
@@ -191,7 +211,9 @@ def send_email(
         EmailDeliveryError: If configuration is invalid or delivery fails.
     """
     current_settings = Settings()
-    provider = current_settings.email_provider.strip().lower()
+    provider = (provider_override or current_settings.email_provider).strip().lower()
+    if not provider_override and os.environ.get("RESEND_API_KEY") and os.environ.get("RESEND_FROM_EMAIL"):
+        provider = "resend"
     if provider not in {"mailgun", "resend"}:
         raise EmailDeliveryError(
             "EMAIL_PROVIDER must be either 'mailgun' or 'resend'.",
@@ -200,9 +222,11 @@ def send_email(
         )
 
     if provider == "mailgun":
-        settings, sender = _configured_mailgun_sender(from_email)
+        settings, sender, mailgun_key, mailgun_domain, mailgun_base_url = _configured_mailgun_sender(
+            from_email, api_key_override, provider_config
+        )
     else:
-        sender, test_recipient = _configured_resend_sender(from_email)
+        sender, test_recipient = _configured_resend_sender(from_email, api_key_override)
         all_recipients = [*to, *(cc or []), *(bcc or [])]
         _validate_test_domain_recipients(sender, all_recipients, test_recipient)
 
@@ -210,7 +234,10 @@ def send_email(
     for attempt in range(1, MAX_SEND_ATTEMPTS + 1):
         try:
             if provider == "mailgun":
-                response = _send_via_mailgun(settings, sender, to, subject, html, cc, bcc, text)
+                response = _send_via_mailgun(
+                    settings, sender, to, subject, html, cc, bcc, text,
+                    mailgun_key, mailgun_domain, mailgun_base_url, reply_to,
+                )
             else:
                 params: resend.Emails.SendParams = {
                     "from": sender,
@@ -224,6 +251,8 @@ def send_email(
                     params["bcc"] = bcc
                 if text:
                     params["text"] = text
+                if reply_to:
+                    params["reply_to"] = reply_to
                 response = resend.Emails.send(params)
             return {"provider": provider, "attempts": attempt, "response": response}
         except Exception as exc:
@@ -244,6 +273,10 @@ def send_meeting_summary_email(
     decisions: List[str],
     action_items: List[str],
     from_email: Optional[str] = None,
+    provider_override: Optional[str] = None,
+    api_key_override: Optional[str] = None,
+    provider_config: Optional[Dict[str, str]] = None,
+    reply_to: Optional[str] = None,
 ) -> Any:
     """
     Send a formatted meeting summary email.
@@ -287,4 +320,8 @@ def send_meeting_summary_email(
         subject=subject,
         html=html_content,
         from_email=from_email,
+        provider_override=provider_override,
+        api_key_override=api_key_override,
+        provider_config=provider_config,
+        reply_to=reply_to,
     )

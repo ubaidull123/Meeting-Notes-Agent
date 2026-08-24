@@ -1,0 +1,48 @@
+{
+  "meeting_id": "c6a5bc45-b26e-46ac-907b-93afaf7fc906",
+  "meeting_title": "youtube video",
+  "tasks": [
+    {
+      "id": "7da2b522",
+      "title": "Sam to make the necessary changes to the minutes regarding Graham's attendance. Deadline not specifi",
+      "description": "Sam to make the necessary changes to the minutes regarding Graham's attendance. Deadline not specified.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "c6a5bc45-b26e-46ac-907b-93afaf7fc906",
+      "meeting_title": "youtube video",
+      "action_item_index": 0,
+      "created_at": "2026-08-19T13:42:20.699195",
+      "updated_at": "2026-08-19T13:42:20.699198",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    },
+    {
+      "id": "1bccb8ec",
+      "title": "Jason to continue engaging with local government partners to promote rates relief and support for th",
+      "description": "Jason to continue engaging with local government partners to promote rates relief and support for the tourism sector. Deadline not specified.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "c6a5bc45-b26e-46ac-907b-93afaf7fc906",
+      "meeting_title": "youtube video",
+      "action_item_index": 1,
+      "created_at": "2026-08-19T13:42:20.699218",
+      "updated_at": "2026-08-19T13:42:20.699218",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    }
+  ],
+  "created_at": "2026-08-19T13:42:20.699236",
+  "synced_at": null
+}

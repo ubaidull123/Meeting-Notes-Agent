@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from meeting_notes_agent.core.exceptions import QuotaExceededError
+from meeting_notes_agent.config.core.exceptions import QuotaExceededError
 from meeting_notes_agent.database.models import Meeting, MeetingStatus
 from meeting_notes_agent.database.repositories import (
     UserCreditsRepository,

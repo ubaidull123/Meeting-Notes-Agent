@@ -1,0 +1,88 @@
+{
+  "meeting_id": "7cb7c48f-0f5e-45ed-b924-aa5f73967138",
+  "meeting_title": "projectmeeting",
+  "tasks": [
+    {
+      "id": "8d8f3f7e",
+      "title": "Sara: Implement clarification handling, improve PII redaction, and compare incremental versus full c",
+      "description": "Sara: Implement clarification handling, improve PII redaction, and compare incremental versus full conversation summarization by tomorrow.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "7cb7c48f-0f5e-45ed-b924-aa5f73967138",
+      "meeting_title": "projectmeeting",
+      "action_item_index": 0,
+      "created_at": "2026-08-21T10:49:58.098989",
+      "updated_at": "2026-08-21T10:49:58.098993",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    },
+    {
+      "id": "980c0993",
+      "title": "Hamza: Add the CRM request queue, retry handling, deterministic human-escalation detection, and pre-",
+      "description": "Hamza: Add the CRM request queue, retry handling, deterministic human-escalation detection, and pre-logging redaction; deadline not specified.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "7cb7c48f-0f5e-45ed-b924-aa5f73967138",
+      "meeting_title": "projectmeeting",
+      "action_item_index": 1,
+      "created_at": "2026-08-21T10:49:58.099046",
+      "updated_at": "2026-08-21T10:49:58.099048",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    },
+    {
+      "id": "c8c8d670",
+      "title": "Ayesha: Fix the mobile overflow problem, complete dashboard filters, and add the sensitive-informati",
+      "description": "Ayesha: Fix the mobile overflow problem, complete dashboard filters, and add the sensitive-information warning; deadline not specified.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "7cb7c48f-0f5e-45ed-b924-aa5f73967138",
+      "meeting_title": "projectmeeting",
+      "action_item_index": 2,
+      "created_at": "2026-08-21T10:49:58.099084",
+      "updated_at": "2026-08-21T10:49:58.099085",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    },
+    {
+      "id": "add74a21",
+      "title": "Bilal: Rerun the failed scenarios and prepare another regression test once changes are deployed; inc",
+      "description": "Bilal: Rerun the failed scenarios and prepare another regression test once changes are deployed; increase the test set to around 200 conversations; deadline not specified.",
+      "status": "todo",
+      "priority": "medium",
+      "assignee": null,
+      "due_date": null,
+      "labels": [
+        "meeting-action-item"
+      ],
+      "meeting_id": "7cb7c48f-0f5e-45ed-b924-aa5f73967138",
+      "meeting_title": "projectmeeting",
+      "action_item_index": 3,
+      "created_at": "2026-08-21T10:49:58.099116",
+      "updated_at": "2026-08-21T10:49:58.099117",
+      "github_issue_number": null,
+      "github_issue_url": null,
+      "synced_at": null
+    }
+  ],
+  "created_at": "2026-08-21T10:49:58.099161",
+  "synced_at": null
+}

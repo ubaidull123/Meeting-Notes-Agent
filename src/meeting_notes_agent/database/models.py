@@ -84,6 +84,7 @@ class User(Base):
     ai_config = relationship("UserAIConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
     credentials = relationship("UserCredential", back_populates="user", cascade="all, delete-orphan")
     email_config = relationship("UserEmailConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    product_settings = relationship("UserProductSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
     credit_transactions = relationship("CreditTransaction", backref="user", lazy="dynamic")
     usage_records_new = relationship("UsageRecord", backref="user", lazy="dynamic")
     ai_overrides = relationship("MeetingAIOverride", back_populates="user", lazy="dynamic")

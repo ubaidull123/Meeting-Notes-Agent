@@ -5,12 +5,12 @@ langchain-comunity
 
 #langgraph
 langgraph
+langgraph-checkpoint-sqlite
 
 #models
 langchain-openai
 langchain-openrouter
 langchain-huggingface
-langchain-groq
 
 #data
 dotenv

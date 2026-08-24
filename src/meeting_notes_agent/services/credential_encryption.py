@@ -3,6 +3,7 @@
 Isolated behind a service interface for future KMS replacement.
 """
 import base64
+import json
 import os
 from typing import Optional
 
@@ -30,7 +31,7 @@ class CredentialEncryptionService:
             master_key: Master encryption key. If None, reads from settings.
         """
         if master_key is None:
-            from meeting_notes_agent.core.config import settings
+            from meeting_notes_agent.config.core.config import settings
             master_key = settings.credential_encryption_key
 
         if not master_key:
@@ -107,6 +108,16 @@ class CredentialEncryptionService:
             return plaintext.decode("utf-8")
         except Exception as e:
             raise ValueError(f"Decryption failed: {e}")
+
+    def encrypt_json(self, value: dict) -> str:
+        """Encrypt structured provider configuration without exposing it to clients."""
+        return self.encrypt(json.dumps(value, separators=(",", ":"), sort_keys=True))
+
+    def decrypt_json(self, encrypted: str | None) -> dict:
+        if not encrypted:
+            return {}
+        value = json.loads(self.decrypt(encrypted))
+        return value if isinstance(value, dict) else {}
 
     @staticmethod
     def mask_key(api_key: str) -> str:

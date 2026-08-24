@@ -1,0 +1,8 @@
+{
+  "python_version": "3.13",
+  "dependencies": ["."],
+  "graphs": {
+    "meeting_notes_agent": "./src/meeting_notes_agent/graph.py:graph"
+  },
+  "env": ".env"
+}

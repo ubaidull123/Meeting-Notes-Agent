@@ -25,14 +25,15 @@ from meeting_notes_agent.schemas.meeting import (
 )
 from meeting_notes_agent.services import ProcessingService
 from meeting_notes_agent.services.processing_service import process_meeting_in_background
-from meeting_notes_agent.core.exceptions import (
+from meeting_notes_agent.config.core.exceptions import (
     InsufficientCreditsError,
     NotFoundError,
     ProcessingError,
     QuotaExceededError,
     ValidationError,
+    to_http_exception,
 )
-from meeting_notes_agent.core.config import settings
+from meeting_notes_agent.config.core.config import settings
 
 router = APIRouter(prefix="/meetings", tags=["Meetings"])
 
@@ -215,7 +216,7 @@ async def start_processing(
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except (QuotaExceededError, InsufficientCreditsError) as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise to_http_exception(e)
     except ProcessingError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from meeting_notes_agent.database import TaskRepository, get_db
 from meeting_notes_agent.database.models import TaskStatus, TaskPriority
-from meeting_notes_agent.core.exceptions import NotFoundError, ValidationError
+from meeting_notes_agent.config.core.exceptions import NotFoundError, ValidationError
 from meeting_notes_agent.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskListResponse
 
 

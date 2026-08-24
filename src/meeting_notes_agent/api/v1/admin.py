@@ -16,7 +16,7 @@ from meeting_notes_agent.schemas.admin import (
 )
 from meeting_notes_agent.schemas.user import UserQuotaResponse, UserCreditsResponse
 from meeting_notes_agent.services import AdminService
-from meeting_notes_agent.core.exceptions import NotFoundError, ValidationError
+from meeting_notes_agent.config.core.exceptions import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
