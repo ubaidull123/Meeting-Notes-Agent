@@ -1,4 +1,4 @@
-import { UserRole, UserQuota, UserCredits, UserUsage } from './user';
+import { PlatformRole, UserRole, UserQuota, UserCredits, UserUsage } from './user';
 import { MeetingStatus } from './meeting';
 
 export interface AdminStats {
@@ -22,6 +22,7 @@ export interface AdminUserListItem {
   email: string;
   full_name: string;
   role: UserRole;
+  platform_role: PlatformRole;
   is_active: boolean;
   created_at: string;
   quota_limit: number;
@@ -34,6 +35,7 @@ export interface AdminUserDetail {
   email: string;
   full_name: string;
   role: UserRole;
+  platform_role: PlatformRole;
   is_active: boolean;
   created_at: string;
   updated_at: string;

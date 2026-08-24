@@ -27,6 +27,9 @@ export interface MeetingListItem {
   meeting_date: string;
   meeting_time?: string | null;
   project_name?: string | null;
+  team_id: string;
+  project_id?: string | null;
+  created_by: number;
   status: MeetingStatus;
   created_at: string;
   updated_at: string;
@@ -35,6 +38,9 @@ export interface MeetingListItem {
 export interface Meeting {
   id: string;
   user_id: number;
+  team_id: string;
+  project_id?: string | null;
+  created_by: number;
   title: string;
   meeting_date: string;
   meeting_time?: string | null;
@@ -71,6 +77,8 @@ export interface MeetingCreateRequest {
   meeting_date?: string;
   meeting_time?: string | null;
   project_name?: string | null;
+  team_id?: string;
+  project_id?: string | null;
   agenda?: string[];
   notes?: string | null;
   attendees: Array<{ name: string; email: string }>;
@@ -84,6 +92,7 @@ export interface MeetingUpdateRequest {
   meeting_date?: string;
   meeting_time?: string | null;
   project_name?: string | null;
+  project_id?: string | null;
   agenda?: string[];
   notes?: string | null;
   attendees?: Array<{ name: string; email: string }>;

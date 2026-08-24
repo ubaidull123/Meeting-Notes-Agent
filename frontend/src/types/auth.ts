@@ -1,4 +1,4 @@
-import { UserRole } from './user';
+import { PlatformRole, UserRole } from './user';
 
 export interface TokenResponse {
   access_token: string;
@@ -13,6 +13,7 @@ export interface AuthState {
     email: string;
     full_name: string;
     role: UserRole;
+    platform_role: PlatformRole;
     is_active: boolean;
   } | null;
   accessToken: string | null;

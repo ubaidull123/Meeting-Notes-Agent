@@ -10,6 +10,8 @@ interface TaskTableProps {
   onSelectTask: (task: Task) => void;
   onDeleteTask: (task: Task) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
+  canManageActions?: boolean;
+  canChangeStatus?: (task: Task) => boolean;
 }
 
 export const TaskTable: React.FC<TaskTableProps> = ({
@@ -17,6 +19,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onSelectTask,
   onDeleteTask,
   onStatusChange,
+  canManageActions = true,
+  canChangeStatus = () => true,
 }) => {
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
@@ -29,7 +33,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             <th className="py-3 px-4">Priority</th>
             <th className="py-3 px-4">Status</th>
             <th className="py-3 px-4">Due Date</th>
-            <th className="py-3 px-4 text-right">Actions</th>
+            {canManageActions && <th className="py-3 px-4 text-right">Actions</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -63,6 +67,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
                 <select
                   value={task.status}
+                  disabled={!canChangeStatus(task)}
                   onChange={(e) => onStatusChange(task.id, e.target.value as TaskStatus)}
                   className="text-xs bg-background border border-input rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-teal-500 font-medium"
                 >
@@ -83,7 +88,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   <span className="text-muted-foreground/60">—</span>
                 )}
               </td>
-              <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+              {canManageActions && <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-end gap-1">
                   <button
                     type="button"
@@ -102,7 +107,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>

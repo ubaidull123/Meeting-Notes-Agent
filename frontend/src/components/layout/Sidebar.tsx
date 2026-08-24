@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTeam } from '../../context/TeamContext';
 import { cn } from '../../utils/cn';
 import {
   LayoutDashboard,
@@ -9,6 +10,8 @@ import {
   ShieldAlert,
   Users,
   Layers,
+  FolderKanban,
+  Settings,
   Sparkles,
   ChevronLeft,
   ChevronRight,
@@ -26,13 +29,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigateMobile,
 }) => {
   const { isAdmin } = useAuth();
+  const { activeTeam, canManageActiveTeam, selectTeam, teams } = useTeam();
   const location = useLocation();
 
-  const userNavItems = [
+  const memberNavItems = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'My Tasks', icon: CheckSquare, path: '/tasks' },
+    { label: 'Projects', icon: FolderKanban, path: '/projects' },
+    { label: 'Meetings', icon: Calendar, path: '/meetings' },
+  ];
+
+  const managerNavItems = [
+    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Projects', icon: FolderKanban, path: '/projects' },
     { label: 'Meetings', icon: Calendar, path: '/meetings' },
     { label: 'Tasks', icon: CheckSquare, path: '/tasks' },
+    { label: 'Members', icon: Users, path: '/members' },
+    { label: 'Team Settings', icon: Settings, path: '/team-settings' },
   ];
+  const userNavItems = canManageActiveTeam ? managerNavItems : memberNavItems;
 
   const adminNavItems = [
     { label: 'Admin Overview', icon: ShieldAlert, path: '/admin' },
@@ -67,6 +82,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
       </div>
+
+      {activeTeam && <div className="border-b border-border p-3">
+        {isCollapsed ? <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-xs font-bold" title={activeTeam.name}>{activeTeam.name.charAt(0).toUpperCase()}</div> : <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Current team<select aria-label="Current team" className="mt-1.5 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm font-medium text-foreground" value={activeTeam.id} onChange={event => selectTeam(event.target.value)}>{teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>}
+      </div>}
 
       {/* Navigation Sections */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">

@@ -11,22 +11,25 @@ import {
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../utils/cn';
+import { useTeam } from '../../context/TeamContext';
 
 const settingsNavigation = [
-  { path: '/settings/profile', label: 'Profile', icon: UserRound },
-  { path: '/settings/ai', label: 'AI & Models', icon: Bot },
-  { path: '/settings/transcription', label: 'Transcription', icon: Captions },
-  { path: '/settings/meetings', label: 'Meeting Defaults', icon: Settings2 },
-  { path: '/settings/email', label: 'Email', icon: Mail },
-  { path: '/settings/notifications', label: 'Notifications', icon: Bell },
-  { path: '/settings/usage', label: 'Credits & Usage', icon: CreditCard },
-  { path: '/settings/privacy', label: 'Privacy & Data', icon: FileLock2 },
-  { path: '/settings/security', label: 'Security', icon: Shield },
+  { path: '/settings/profile', label: 'Profile', icon: UserRound, managerOnly: false },
+  { path: '/settings/ai', label: 'AI & Models', icon: Bot, managerOnly: true },
+  { path: '/settings/transcription', label: 'Transcription', icon: Captions, managerOnly: true },
+  { path: '/settings/meetings', label: 'Meeting Defaults', icon: Settings2, managerOnly: true },
+  { path: '/settings/email', label: 'Email', icon: Mail, managerOnly: true },
+  { path: '/settings/notifications', label: 'Notifications', icon: Bell, managerOnly: false },
+  { path: '/settings/usage', label: 'Credits & Usage', icon: CreditCard, managerOnly: false },
+  { path: '/settings/privacy', label: 'Privacy & Data', icon: FileLock2, managerOnly: false },
+  { path: '/settings/security', label: 'Security', icon: Shield, managerOnly: false },
 ];
 
 export function SettingsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { canManageActiveTeam } = useTeam();
+  const visibleNavigation = settingsNavigation.filter(item => canManageActiveTeam || !item.managerOnly);
 
   return (
     <div className="space-y-6">
@@ -42,7 +45,7 @@ export function SettingsLayout() {
           value={location.pathname}
           onChange={(event) => navigate(event.target.value)}
         >
-          {settingsNavigation.map((item) => (
+          {visibleNavigation.map((item) => (
             <option key={item.path} value={item.path}>{item.label}</option>
           ))}
         </select>
@@ -50,7 +53,7 @@ export function SettingsLayout() {
 
       <div className="grid gap-8 md:grid-cols-[210px_minmax(0,1fr)]">
         <nav className="hidden space-y-1 md:block" aria-label="Settings">
-          {settingsNavigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

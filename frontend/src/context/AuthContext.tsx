@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authApi, LoginPayload, RegisterPayload } from '../api/auth';
 import { tokenStorage } from '../api/client';
-import { UserProfileResponse, UserRole } from '../types/user';
+import { PlatformRole, UserProfileResponse, UserRole } from '../types/user';
 
 interface AuthUser {
   id: number;
   email: string;
   full_name: string;
   role: UserRole;
+  platform_role: PlatformRole;
   is_active: boolean;
 }
 
@@ -45,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: normalizedData.email,
         full_name: normalizedData.full_name,
         role: normalizedData.role,
+        platform_role: normalizedData.platform_role,
         is_active: normalizedData.is_active,
       });
       return normalizedData;
@@ -109,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     isAuthenticated: !!user,
     isLoading,
-    isAdmin: user?.role?.toUpperCase() === 'ADMIN',
+    isAdmin: user?.platform_role === 'platform_admin',
     login,
     register,
     logout,

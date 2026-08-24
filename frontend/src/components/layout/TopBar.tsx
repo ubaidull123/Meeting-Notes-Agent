@@ -53,6 +53,10 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
     if (path === '/meetings/new') return { parent: { label: 'Meetings', path: '/meetings' }, label: 'Create meeting' };
     if (path.startsWith('/meetings/')) return { parent: { label: 'Meetings', path: '/meetings' }, label: 'Meeting details' };
     if (path === '/tasks') return { label: 'Tasks' };
+    if (path === '/projects') return { label: 'Projects' };
+    if (path.startsWith('/projects/')) return { parent: { label: 'Projects', path: '/projects' }, label: 'Project details' };
+    if (path === '/members') return { label: 'Team members' };
+    if (path === '/team-settings') return { label: 'Team settings' };
     if (path === '/usage') return { parent: { label: 'Settings', path: '/settings/profile' }, label: 'Usage & credits' };
     if (path.startsWith('/settings')) return { label: 'Settings' };
     if (path === '/admin') return { label: 'Admin dashboard' };
@@ -232,7 +236,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
                     type="button"
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      navigate('/settings/ai');
+                      navigate('/settings/profile');
                     }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-foreground hover:bg-muted transition-colors text-left"
                   >

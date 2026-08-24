@@ -6,6 +6,8 @@ export interface ListTasksParams {
   page_size?: number;
   meeting_id?: string;
   status?: TaskStatus;
+  team_id?: string;
+  project_id?: string;
 }
 
 export const tasksApi = {

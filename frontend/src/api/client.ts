@@ -13,6 +13,11 @@ export const apiClient = axios.create({
 // Storage keys
 const ACCESS_TOKEN_KEY = 'mna_access_token';
 const REFRESH_TOKEN_KEY = 'mna_refresh_token';
+let activeTeamScope: string | null = null;
+
+export const setActiveTeamScope = (teamId: string | null) => {
+  activeTeamScope = teamId;
+};
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem(ACCESS_TOKEN_KEY),
@@ -51,6 +56,9 @@ apiClient.interceptors.request.use(
     const token = tokenStorage.getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (activeTeamScope && config.headers) {
+      config.headers['X-Team-ID'] = activeTeamScope;
     }
     return config;
   },

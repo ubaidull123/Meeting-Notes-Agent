@@ -1,10 +1,12 @@
 export type UserRole = 'USER' | 'ADMIN';
+export type PlatformRole = 'user' | 'platform_admin';
 
 export interface User {
   id: number;
   email: string;
   full_name: string;
   role: UserRole;
+  platform_role: PlatformRole;
   is_active: boolean;
   created_at: string;
   updated_at?: string;
@@ -40,6 +42,7 @@ export interface UserProfileResponse {
   email: string;
   full_name: string;
   role: UserRole;
+  platform_role: PlatformRole;
   is_active: boolean;
   created_at: string;
   quota?: UserQuota | null;
