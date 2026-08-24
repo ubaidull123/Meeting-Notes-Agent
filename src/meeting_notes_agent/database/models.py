@@ -31,6 +31,21 @@ class UserRole(str, PyEnum):
     ADMIN = "ADMIN"
 
 
+class PlatformRole(str, PyEnum):
+    """Platform-wide SaaS authority, separate from team membership roles."""
+
+    USER = "user"
+    PLATFORM_ADMIN = "platform_admin"
+
+
+class TeamRole(str, PyEnum):
+    """Authority within one team workspace."""
+
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
 class TaskStatus(str, PyEnum):
     """Task status options."""
     TODO = "todo"
@@ -73,11 +88,21 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     role = Column(SQLEnum(UserRole, native_enum=False), default=UserRole.USER, nullable=False)
+    platform_role = Column(
+        SQLEnum(PlatformRole, native_enum=False),
+        default=PlatformRole.USER,
+        nullable=False,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
-    meetings = relationship("Meeting", back_populates="user", cascade="all, delete-orphan")
+    meetings = relationship(
+        "Meeting",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="Meeting.user_id",
+    )
     quotas = relationship("UserQuota", back_populates="user", uselist=False, cascade="all, delete-orphan")
     credits = relationship("UserCredits", back_populates="user", uselist=False, cascade="all, delete-orphan")
     usage_records = relationship("UserUsage", back_populates="user", cascade="all, delete-orphan")
@@ -88,6 +113,24 @@ class User(Base):
     credit_transactions = relationship("CreditTransaction", backref="user", lazy="dynamic")
     usage_records_new = relationship("UsageRecord", backref="user", lazy="dynamic")
     ai_overrides = relationship("MeetingAIOverride", back_populates="user", lazy="dynamic")
+    teams_created = relationship(
+        "Team", back_populates="creator", foreign_keys="Team.created_by"
+    )
+    team_memberships = relationship(
+        "TeamMembership", back_populates="user", cascade="all, delete-orphan"
+    )
+    projects_created = relationship(
+        "Project", back_populates="creator", foreign_keys="Project.created_by"
+    )
+    project_memberships = relationship(
+        "ProjectMembership", back_populates="user", cascade="all, delete-orphan"
+    )
+    meetings_created = relationship(
+        "Meeting", back_populates="creator", foreign_keys="Meeting.created_by"
+    )
+    assigned_tasks = relationship(
+        "Task", back_populates="assigned_user", foreign_keys="Task.assigned_user_id"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email='{self.email}', role='{self.role.value}')>"
@@ -147,12 +190,176 @@ class UserUsage(Base):
         return f"<UserUsage(user_id={self.user_id}, month={self.month}, meetings={self.meetings_processed})>"
 
 
+class Team(Base):
+    """Organizational workspace containing projects and meetings."""
+
+    __tablename__ = "teams"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    created_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    creator = relationship("User", back_populates="teams_created", foreign_keys=[created_by])
+    memberships = relationship(
+        "TeamMembership", back_populates="team", cascade="all, delete-orphan"
+    )
+    projects = relationship("Project", back_populates="team", cascade="all, delete-orphan")
+    meetings = relationship("Meeting", back_populates="team")
+    tasks = relationship("Task", back_populates="team")
+
+
+class TeamMembership(Base):
+    """A user's role within one team."""
+
+    __tablename__ = "team_memberships"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role = Column(SQLEnum(TeamRole, native_enum=False), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    team = relationship("Team", back_populates="memberships")
+    user = relationship("User", back_populates="team_memberships")
+
+    __table_args__ = (
+        UniqueConstraint("team_id", "user_id", name="uq_team_membership_team_user"),
+    )
+
+
+class Project(Base):
+    """Team-scoped project with reusable context for meeting processing."""
+
+    __tablename__ = "projects"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(255), nullable=False)
+    normalized_name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    context = Column(Text, nullable=True)
+    created_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    team = relationship("Team", back_populates="projects")
+    creator = relationship("User", back_populates="projects_created", foreign_keys=[created_by])
+    memberships = relationship(
+        "ProjectMembership", back_populates="project", cascade="all, delete-orphan"
+    )
+    meetings = relationship("Meeting", back_populates="project")
+    tasks = relationship("Task", back_populates="project")
+
+    __table_args__ = (
+        UniqueConstraint("team_id", "normalized_name", name="uq_project_team_normalized_name"),
+        Index("idx_projects_team_name", "team_id", "name"),
+    )
+
+
+class ProjectMembership(Base):
+    """Explicit user access to a project within its team."""
+
+    __tablename__ = "project_memberships"
+
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    project = relationship("Project", back_populates="memberships")
+    user = relationship("User", back_populates="project_memberships")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id", "user_id", name="uq_project_membership_project_user"
+        ),
+    )
+
+
 class Meeting(Base):
     """Meeting model."""
     __tablename__ = "meetings"
 
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    team_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
     title = Column(String(500), nullable=False)
     meeting_date = Column(Date, nullable=False)
     meeting_time = Column(String(50), nullable=True)
@@ -184,7 +391,12 @@ class Meeting(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
-    user = relationship("User", back_populates="meetings")
+    user = relationship("User", back_populates="meetings", foreign_keys=[user_id])
+    team = relationship("Team", back_populates="meetings")
+    project = relationship("Project", back_populates="meetings")
+    creator = relationship(
+        "User", back_populates="meetings_created", foreign_keys=[created_by]
+    )
     attendees = relationship("Attendee", back_populates="meeting", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="meeting", cascade="all, delete-orphan")
     ai_override = relationship("MeetingAIOverride", back_populates="meeting", uselist=False, cascade="all, delete-orphan")
@@ -226,6 +438,24 @@ class Task(Base):
 
     id = Column(String(8), primary_key=True)
     meeting_id = Column(PGUUID(as_uuid=True), ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False, index=True)
+    team_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project_id = Column(
+        PGUUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    assigned_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     meeting_title = Column(String(500), nullable=False)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
@@ -242,6 +472,11 @@ class Task(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     meeting = relationship("Meeting", back_populates="tasks")
+    team = relationship("Team", back_populates="tasks")
+    project = relationship("Project", back_populates="tasks")
+    assigned_user = relationship(
+        "User", back_populates="assigned_tasks", foreign_keys=[assigned_user_id]
+    )
 
     __table_args__ = (
         Index("idx_tasks_meeting", "meeting_id"),

@@ -37,6 +37,8 @@ class MeetingCreate(MeetingBase):
     audio_file_path: Optional[str] = None
     transcript_file_path: Optional[str] = None
     transcript_text: Optional[str] = None
+    team_id: Optional[UUID] = None
+    project_id: Optional[UUID] = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -63,6 +65,7 @@ class MeetingUpdate(BaseModel):
     meeting_date: Optional[date] = None
     meeting_time: Optional[str] = Field(default=None, max_length=50)
     project_name: Optional[str] = Field(default=None, max_length=255)
+    project_id: Optional[UUID] = None
     agenda: Optional[List[str]] = None
     notes: Optional[str] = None
     attendees: Optional[List[AttendeeBase]] = None
@@ -75,6 +78,9 @@ class MeetingListItem(BaseModel):
     meeting_date: date
     meeting_time: Optional[str]
     project_name: Optional[str]
+    team_id: UUID
+    project_id: Optional[UUID]
+    created_by: int
     status: str
     created_at: datetime
     updated_at: datetime
@@ -86,6 +92,9 @@ class MeetingResponse(MeetingBase):
     """Meeting response schema."""
     id: UUID
     user_id: int
+    team_id: UUID
+    project_id: Optional[UUID]
+    created_by: int
     status: str
     audio_file_path: Optional[str]
     transcript_file_path: Optional[str]

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
-from meeting_notes_agent.database.models import UserRole
+from meeting_notes_agent.database.models import PlatformRole, UserRole
 
 
 class UserBase(BaseModel):
@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    platform_role: PlatformRole = PlatformRole.USER
     is_active: bool
 
 
@@ -39,15 +40,15 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
-
     model_config = ConfigDict(
+        from_attributes=True,
         json_schema_extra={
             "example": {
                 "id": 1,
                 "email": "user@example.com",
                 "full_name": "John Doe",
-                "role": "user",
+                "role": "USER",
+                "platform_role": "user",
                 "is_active": True,
                 "created_at": "2024-01-15T10:30:00Z",
                 "updated_at": "2024-01-15T10:30:00Z",
@@ -69,6 +70,7 @@ class UserProfileResponse(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    platform_role: PlatformRole
     is_active: bool
     created_at: datetime
     quota: Optional["UserQuotaResponse"] = None
