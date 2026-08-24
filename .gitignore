@@ -53,6 +53,9 @@ data/langgraph_checkpoints.sqlite*
 tmp/
 temp/
 *.tmp
+.test-tmp*/
+*.dump
+*.backup
 
 # Local development tools
 .claude/
