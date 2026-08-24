@@ -4,6 +4,7 @@ from typing import Annotated, Optional, List
 from uuid import UUID
 
 from meeting_notes_agent.auth.dependencies import get_current_user_id, get_current_user
+from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import TaskStatus, TaskPriority
 from meeting_notes_agent.schemas.task import (
     TaskCreate,
@@ -21,9 +22,10 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 async def create_task(
     data: TaskCreate,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Create a new task."""
-    task_service = TaskService()
+    task_service = TaskService(db)
     try:
         return task_service.create_task(current_user_id, data)
     except ValidationError as e:
@@ -37,15 +39,20 @@ async def list_tasks(
     page_size: int = Query(20, ge=1, le=100),
     meeting_id: Optional[UUID] = None,
     task_status: Optional[TaskStatus] = Query(None, alias="status"),
+    team_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
+    db=Depends(get_db),
 ):
     """List user's tasks."""
-    task_service = TaskService()
+    task_service = TaskService(db)
     return task_service.list_tasks(
         user_id=current_user_id,
         page=page,
         page_size=page_size,
         meeting_id=meeting_id,
         status=task_status,
+        team_id=team_id,
+        project_id=project_id,
     )
 
 
@@ -53,9 +60,10 @@ async def list_tasks(
 async def get_task(
     task_id: str,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Get task by ID."""
-    task_service = TaskService()
+    task_service = TaskService(db)
     try:
         return task_service.get_task(task_id, current_user_id)
     except NotFoundError as e:
@@ -67,9 +75,10 @@ async def update_task(
     task_id: str,
     data: TaskUpdate,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Update a task."""
-    task_service = TaskService()
+    task_service = TaskService(db)
     try:
         return task_service.update_task(task_id, current_user_id, data)
     except NotFoundError as e:
@@ -82,9 +91,10 @@ async def update_task(
 async def delete_task(
     task_id: str,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Delete a task."""
-    task_service = TaskService()
+    task_service = TaskService(db)
     try:
         task_service.delete_task(task_id, current_user_id)
     except NotFoundError as e:
@@ -95,9 +105,10 @@ async def delete_task(
 async def mark_task_complete(
     task_id: str,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Mark task as complete."""
-    task_service = TaskService()
+    task_service = TaskService(db)
     try:
         return task_service.mark_task_complete(task_id, current_user_id)
     except NotFoundError as e:

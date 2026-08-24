@@ -136,6 +136,7 @@ class AdminService:
                 email=user.email,
                 full_name=user.full_name,
                 role=user.role,
+                platform_role=user.platform_role,
                 is_active=user.is_active,
                 created_at=user.created_at,
                 quota_limit=quota.monthly_meeting_limit if quota else 0,
@@ -166,6 +167,7 @@ class AdminService:
             email=user.email,
             full_name=user.full_name,
             role=user.role,
+            platform_role=user.platform_role,
             is_active=user.is_active,
             created_at=user.created_at,
             updated_at=user.updated_at,
@@ -194,7 +196,7 @@ class AdminService:
         return self.get_user(user_id)
 
     def delete_user(self, user_id: int, current_admin_id: int | None = None) -> None:
-        """Delete user (admin)."""
+        """Disable a user while preserving tenant and meeting history."""
         db = self._get_db()
         user_repo = UserRepository(db)
 
@@ -205,7 +207,7 @@ class AdminService:
         if not user:
             raise NotFoundError("User not found")
 
-        user_repo.delete(user)
+        user.is_active = False
         db.commit()
 
     def adjust_credits(self, user_id: int, amount: int, reason: str) -> UserCreditsResponse:

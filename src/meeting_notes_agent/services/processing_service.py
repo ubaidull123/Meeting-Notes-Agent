@@ -19,7 +19,17 @@ from meeting_notes_agent.database import (
     SessionLocal,
     get_db,
 )
-from meeting_notes_agent.database.models import Meeting, MeetingStatus, Task, TaskStatus, TaskPriority
+from meeting_notes_agent.database.models import (
+    Meeting,
+    MeetingStatus,
+    Project,
+    ProjectMembership,
+    Task,
+    TaskStatus,
+    TaskPriority,
+    TeamMembership,
+    TeamRole,
+)
 from meeting_notes_agent.config.core.exceptions import (
     InsufficientCreditsError,
     NotFoundError,
@@ -33,6 +43,8 @@ from meeting_notes_agent.services.ai_settings_service import AISettingsService
 from meeting_notes_agent.services.credits_service import CreditsService
 from meeting_notes_agent.services.meeting_override_service import MeetingOverrideService
 from meeting_notes_agent.services.configuration_resolver import UserConfigurationResolver
+from meeting_notes_agent.services.authorization_service import AuthorizationService
+from meeting_notes_agent.services.project_service import normalize_project_name
 from meeting_notes_agent.schemas.meeting import (
     MeetingCreate,
     MeetingUpdate,
@@ -67,6 +79,44 @@ class ProcessingService:
         if self.db:
             return self.db
         return next(get_db())
+
+    @staticmethod
+    def _resolve_project(
+        db,
+        *,
+        team_id: UUID,
+        user_id: int,
+        project_id: UUID | None,
+        project_name: str | None,
+    ) -> Project | None:
+        authorization = AuthorizationService(db)
+        if project_id is not None:
+            project = authorization.require_project_admin(project_id, user_id)
+            if project.team_id != team_id:
+                raise ValidationError("Project does not belong to the selected team")
+            return project
+        if not project_name or not project_name.strip():
+            return None
+        display_name, normalized_name = normalize_project_name(project_name)
+        project = (
+            db.query(Project)
+            .filter(
+                Project.team_id == team_id,
+                Project.normalized_name == normalized_name,
+            )
+            .first()
+        )
+        if project is None:
+            project = Project(
+                team_id=team_id,
+                name=display_name,
+                normalized_name=normalized_name,
+                created_by=user_id,
+            )
+            db.add(project)
+            db.flush()
+            db.add(ProjectMembership(project_id=project.id, user_id=user_id))
+        return project
 
     @property
     def graph(self):
@@ -372,13 +422,53 @@ class ProcessingService:
         if input_count > 1:
             raise ValidationError("Provide only one of: audio_file_path, transcript_file_path, or transcript_text")
 
+        authorization = AuthorizationService(db)
+        if data.project_id is not None:
+            project = authorization.require_project_admin(data.project_id, user_id)
+            team_id = project.team_id
+            if data.team_id is not None and data.team_id != team_id:
+                raise ValidationError("Project does not belong to the selected team")
+        elif data.team_id is not None:
+            authorization.require_team_admin(data.team_id, user_id)
+            team_id = data.team_id
+            project = self._resolve_project(
+                db,
+                team_id=team_id,
+                user_id=user_id,
+                project_id=None,
+                project_name=data.project_name,
+            )
+        else:
+            membership = (
+                db.query(TeamMembership)
+                .filter(
+                    TeamMembership.user_id == user_id,
+                    TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
+                )
+                .order_by(TeamMembership.created_at.asc())
+                .first()
+            )
+            if membership is None:
+                raise ValidationError("A team owner or admin membership is required")
+            team_id = membership.team_id
+            project = self._resolve_project(
+                db,
+                team_id=team_id,
+                user_id=user_id,
+                project_id=None,
+                project_name=data.project_name,
+            )
+
         # Create meeting
         meeting = Meeting(
             user_id=user_id,
+            team_id=team_id,
+            project_id=project.id if project else None,
+            created_by=user_id,
             title=data.title,
             meeting_date=data.meeting_date,
             meeting_time=data.meeting_time,
-            project_name=data.project_name,
+            project_name=project.name if project else data.project_name,
             audio_file_path=data.audio_file_path,
             transcript_file_path=data.transcript_file_path,
             transcript_text=data.transcript_text,
@@ -403,12 +493,24 @@ class ProcessingService:
         meeting_repo = MeetingRepository(db)
         attendee_repo = AttendeeRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         update_data = data.model_dump(exclude_unset=True)
         attendees_data = update_data.pop("attendees", None)
+        project_id_supplied = "project_id" in update_data
+        project_id = update_data.pop("project_id", None)
+        project_name_supplied = "project_name" in update_data
+        project_name = update_data.get("project_name")
+        if project_id_supplied or project_name_supplied:
+            project = self._resolve_project(
+                db,
+                team_id=meeting.team_id,
+                user_id=user_id,
+                project_id=project_id,
+                project_name=project_name,
+            )
+            update_data["project_id"] = project.id if project else None
+            update_data["project_name"] = project.name if project else project_name
 
         if update_data:
             meeting_repo.update(meeting, **update_data)
@@ -429,9 +531,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if meeting.status not in [MeetingStatus.DRAFT, MeetingStatus.UPLOADED]:
             raise ValidationError(f"Cannot upload audio for meeting in {meeting.status.value} state")
@@ -457,9 +557,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if meeting.status not in [MeetingStatus.DRAFT, MeetingStatus.UPLOADED]:
             raise ValidationError(f"Cannot upload transcript for meeting in {meeting.status.value} state")
@@ -484,9 +582,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if meeting.status not in [
             MeetingStatus.DRAFT,
@@ -500,7 +596,10 @@ class ProcessingService:
         if not any([meeting.audio_file_path, meeting.transcript_file_path, meeting.transcript_text]):
             raise ValidationError("No input source provided. Upload audio, transcript file, or provide transcript text.")
 
-        self._ensure_processing_allowance(db, user_id, meeting)
+        # Team authority controls who may start work, but provider configuration,
+        # quota, and billing remain attached to the legacy meeting owner during
+        # this compatibility migration.
+        self._ensure_processing_allowance(db, meeting.user_id, meeting)
 
         # Failed processing is safe to retry: discard its terminal error and
         # execute a new graph run with a fresh checkpoint thread.
@@ -528,9 +627,7 @@ class ProcessingService:
         """Execute a previously queued meeting and persist its checkpoint or result."""
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
         if meeting.status == MeetingStatus.CANCELLED and meeting.thread_id == thread_id:
             return ProcessingStartResponse(
                 meeting_id=meeting.id,
@@ -618,9 +715,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if not meeting.thread_id:
             raise ValidationError("No active processing thread found")
@@ -694,9 +789,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if meeting.status not in [MeetingStatus.AWAITING_REVIEW, MeetingStatus.REVISION_REQUESTED]:
             raise ValidationError(f"Meeting not awaiting review. Current status: {meeting.status.value}")
@@ -718,9 +811,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if meeting.status not in [MeetingStatus.AWAITING_EMAIL_REVIEW]:
             raise ValidationError(f"Meeting not awaiting email review. Current status: {meeting.status.value}")
@@ -744,9 +835,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if not meeting.thread_id:
             raise ValidationError("No active processing thread found")
@@ -813,9 +902,7 @@ class ProcessingService:
         meeting_repo = MeetingRepository(db)
         task_repo = TaskRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_access(meeting_id, user_id)
 
         tasks = task_repo.get_by_meeting_id(meeting_id, user_id)
 
@@ -841,9 +928,7 @@ class ProcessingService:
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_access(meeting_id, user_id)
 
         # Map persisted workflow status to a stable, user-facing stage. During
         # processing, existing transcript artifacts distinguish transcription
@@ -890,9 +975,7 @@ class ProcessingService:
         """Cancel an active or paused meeting workflow owned by the user."""
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         cancellable_statuses = {
             MeetingStatus.QUEUED,
@@ -945,29 +1028,28 @@ class ProcessingService:
         page: int = 1,
         page_size: int = 20,
         status: Optional[MeetingStatus] = None,
+        team_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
     ) -> tuple[List[Meeting], int]:
         """List user's meetings."""
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
-        return meeting_repo.get_user_meetings(user_id, page, page_size, status)
+        return meeting_repo.get_user_meetings(
+            user_id, page, page_size, status, team_id, project_id
+        )
 
     def get_meeting(self, meeting_id: UUID, user_id: int) -> Meeting:
         """Get meeting by ID."""
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
-        return meeting
+        return AuthorizationService(db).require_meeting_access(meeting_id, user_id)
 
     def delete_meeting(self, meeting_id: UUID, user_id: int) -> None:
         """Delete a meeting."""
         db = self._get_db()
         meeting_repo = MeetingRepository(db)
 
-        meeting = meeting_repo.get_by_id(meeting_id, user_id)
-        if not meeting:
-            raise NotFoundError("Meeting not found")
+        meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         if meeting.status in [MeetingStatus.PROCESSING, MeetingStatus.AWAITING_REVIEW, MeetingStatus.AWAITING_EMAIL_REVIEW]:
             raise ValidationError("Cannot delete meeting while processing")

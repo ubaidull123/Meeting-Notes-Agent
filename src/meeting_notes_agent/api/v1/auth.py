@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Annotated
 
 from meeting_notes_agent.auth.dependencies import get_current_user_id, get_current_user
+from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import User
 from meeting_notes_agent.schemas.auth import (
     UserRegister,
@@ -22,9 +23,9 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=UserProfileResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: UserRegister):
+async def register(data: UserRegister, db=Depends(get_db)):
     """Register a new user."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         user = auth_service.register(data)
         return user
@@ -35,9 +36,9 @@ async def register(data: UserRegister):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: UserLogin):
+async def login(data: UserLogin, db=Depends(get_db)):
     """Login and get access/refresh tokens."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         access_token, refresh_token = auth_service.login(data)
         return TokenResponse(
@@ -51,9 +52,9 @@ async def login(data: UserLogin):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_tokens(data: RefreshTokenRequest):
+async def refresh_tokens(data: RefreshTokenRequest, db=Depends(get_db)):
     """Refresh access token using refresh token."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         access_token, refresh_token = auth_service.refresh_tokens(data.refresh_token)
         return TokenResponse(
@@ -75,9 +76,12 @@ async def logout(current_user_id: Annotated[int, Depends(get_current_user_id)]):
 
 
 @router.get("/me", response_model=UserProfileResponse)
-async def get_profile(current_user_id: Annotated[int, Depends(get_current_user_id)]):
+async def get_profile(
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
+):
     """Get current user profile."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         return auth_service.get_profile(current_user_id)
     except ValidationError as e:
@@ -88,9 +92,10 @@ async def get_profile(current_user_id: Annotated[int, Depends(get_current_user_i
 async def update_profile(
     full_name: str,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Update current user profile."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         return auth_service.update_profile(current_user_id, full_name)
     except ValidationError as e:
@@ -101,9 +106,10 @@ async def update_profile(
 async def change_password(
     data: ChangePasswordRequest,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Change current user password."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         auth_service.change_password(current_user_id, data)
     except ValidationError as e:

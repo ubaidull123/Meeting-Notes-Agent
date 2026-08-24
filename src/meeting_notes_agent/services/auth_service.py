@@ -9,7 +9,7 @@ from meeting_notes_agent.auth.security import (
     decode_refresh_token,
 )
 from meeting_notes_agent.database import UserRepository, UserQuotaRepository, UserCreditsRepository, UserUsageRepository, get_db
-from meeting_notes_agent.database.models import UserRole
+from meeting_notes_agent.database.models import Team, TeamMembership, TeamRole, UserRole
 from meeting_notes_agent.config.core.exceptions import (
     AuthenticationError,
     ConflictError,
@@ -52,6 +52,23 @@ class AuthService:
             password_hash=password_hash,
             full_name=data.full_name,
             role=UserRole.USER,
+        )
+
+        # Preserve the former independent-user experience as a transactional
+        # default workspace while enabling future multi-team membership.
+        default_team = Team(
+            name=f"{data.full_name.strip()[:248]}'s Team",
+            description="Default workspace",
+            created_by=user.id,
+        )
+        db.add(default_team)
+        db.flush()
+        db.add(
+            TeamMembership(
+                team_id=default_team.id,
+                user_id=user.id,
+                role=TeamRole.OWNER,
+            )
         )
 
         # Create default quota and credits with initial balance
@@ -194,6 +211,7 @@ class AuthService:
             email=user.email,
             full_name=user.full_name,
             role=user.role,
+            platform_role=user.platform_role,
             is_active=user.is_active,
             created_at=user.created_at,
             quota=UserQuotaResponse.model_validate(quota) if quota else None,

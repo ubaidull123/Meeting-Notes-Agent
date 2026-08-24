@@ -9,6 +9,9 @@ from meeting_notes_agent.services.ai_settings_service import AISettingsService
 from meeting_notes_agent.services.credits_service import CreditsService
 from meeting_notes_agent.services.email_settings_service import EmailSettingsService
 from meeting_notes_agent.services.meeting_override_service import MeetingOverrideService
+from meeting_notes_agent.services.authorization_service import AuthorizationService
+from meeting_notes_agent.services.project_service import ProjectService
+from meeting_notes_agent.services.team_service import TeamService
 
 __all__ = [
     "AuthService",
@@ -21,4 +24,7 @@ __all__ = [
     "CreditsService",
     "EmailSettingsService",
     "MeetingOverrideService",
+    "AuthorizationService",
+    "ProjectService",
+    "TeamService",
 ]

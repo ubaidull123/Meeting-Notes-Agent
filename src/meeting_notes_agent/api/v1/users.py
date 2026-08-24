@@ -4,6 +4,7 @@ from typing import Annotated, Optional
 from pydantic import BaseModel
 
 from meeting_notes_agent.auth.dependencies import get_current_user_id, get_current_user, require_admin
+from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import User, UserRole
 from meeting_notes_agent.schemas.user import (
     UserProfileResponse,
@@ -25,9 +26,12 @@ class UpdateProfileRequest(BaseModel):
 
 
 @router.get("/me", response_model=UserProfileResponse)
-async def get_my_profile(current_user_id: Annotated[int, Depends(get_current_user_id)]):
+async def get_my_profile(
+    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
+):
     """Get current user profile with quota, credits, and usage."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         return auth_service.get_profile(current_user_id)
     except ValidationError as e:
@@ -38,9 +42,10 @@ async def get_my_profile(current_user_id: Annotated[int, Depends(get_current_use
 async def update_my_profile(
     data: UpdateProfileRequest,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Update current user profile."""
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         return auth_service.update_profile(current_user_id, data.full_name)
     except ValidationError as e:
@@ -51,10 +56,11 @@ async def update_my_profile(
 async def change_my_password(
     data: ChangePasswordRequest,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Change current user password."""
     from meeting_notes_agent.schemas.auth import ChangePasswordRequest
-    auth_service = AuthService()
+    auth_service = AuthService(db)
     try:
         auth_service.change_password(current_user_id, data)
     except ValidationError as e:
@@ -72,9 +78,10 @@ async def list_users(
     search: Optional[str] = None,
     role: Optional[UserRole] = None,
     is_active: Optional[bool] = None,
+    db=Depends(get_db),
 ):
     """List all users (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     users, total = admin_service.list_users(
         page=page,
         page_size=page_size,
@@ -89,9 +96,10 @@ async def list_users(
 async def get_user(
     user_id: int,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Get user detail (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.get_user(user_id)
     except NotFoundError as e:
@@ -103,9 +111,10 @@ async def update_user(
     user_id: int,
     data: AdminUserUpdate,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Update user (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.update_user(user_id, data)
     except NotFoundError as e:
@@ -118,9 +127,10 @@ async def update_user(
 async def delete_user(
     user_id: int,
     admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Delete user (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         admin_service.delete_user(user_id, current_admin_id=admin.id)
     except NotFoundError as e:
@@ -135,9 +145,10 @@ async def adjust_user_credits(
     amount: int,
     reason: str,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Adjust user credits (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.adjust_credits(user_id, amount, reason)
     except NotFoundError as e:
@@ -151,9 +162,10 @@ async def adjust_user_quota(
     user_id: int,
     monthly_limit: int,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Adjust user quota (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.adjust_quota(user_id, monthly_limit)
     except NotFoundError as e:

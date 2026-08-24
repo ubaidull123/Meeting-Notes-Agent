@@ -27,7 +27,7 @@ from meeting_notes_agent.config.core.exceptions import (
 )
 from meeting_notes_agent.database.session import init_db
 from meeting_notes_agent.config.core.logging import setup_logging
-from meeting_notes_agent.api.v1 import auth, users, meetings, tasks, admin, settings as settings_routes
+from meeting_notes_agent.api.v1 import auth, users, meetings, tasks, admin, projects, teams, settings as settings_routes
 
 
 # Setup logging
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan events."""
     logger.info("Starting Meeting Notes API...")
     init_db()
-    logger.info("Database initialized")
+    logger.info("Database connectivity verified")
     yield
     logger.info("Shutting down Meeting Notes API...")
 
@@ -160,6 +160,8 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router, prefix="/api/v1")
     app.include_router(admin.router, prefix="/api/v1")
     app.include_router(settings_routes.router, prefix="/api/v1")
+    app.include_router(teams.router, prefix="/api/v1")
+    app.include_router(projects.router, prefix="/api/v1")
 
     # Health endpoints
     @app.get("/health", tags=["Health"])

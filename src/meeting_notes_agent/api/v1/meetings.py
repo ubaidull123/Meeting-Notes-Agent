@@ -4,6 +4,7 @@ from typing import Annotated, Optional, List
 from uuid import UUID
 
 from meeting_notes_agent.auth.dependencies import get_current_user_id, get_current_user, require_admin
+from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import MeetingStatus
 from meeting_notes_agent.schemas.meeting import (
     AttendeeBase,
@@ -24,6 +25,7 @@ from meeting_notes_agent.schemas.meeting import (
     EmailSendResponse,
 )
 from meeting_notes_agent.services import ProcessingService
+from meeting_notes_agent.services.authorization_service import AuthorizationService
 from meeting_notes_agent.services.processing_service import process_meeting_in_background
 from meeting_notes_agent.config.core.exceptions import (
     InsufficientCreditsError,
@@ -42,9 +44,10 @@ router = APIRouter(prefix="/meetings", tags=["Meetings"])
 async def create_meeting(
     data: MeetingCreate,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Create a new meeting."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         meeting = processing_service.create_meeting(current_user_id, data)
         return MeetingResponse.model_validate(meeting)
@@ -58,14 +61,19 @@ async def list_meetings(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     meeting_status: Optional[MeetingStatus] = Query(None, alias="status"),
+    team_id: Optional[UUID] = None,
+    project_id: Optional[UUID] = None,
+    db=Depends(get_db),
 ):
     """List user's meetings."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     meetings, total = processing_service.list_meetings(
         user_id=current_user_id,
         page=page,
         page_size=page_size,
         status=meeting_status,
+        team_id=team_id,
+        project_id=project_id,
     )
     return [MeetingListItem.model_validate(m) for m in meetings]
 
@@ -74,9 +82,10 @@ async def list_meetings(
 async def get_meeting(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Get meeting by ID."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         meeting = processing_service.get_meeting(meeting_id, current_user_id)
         return MeetingResponse.model_validate(meeting)
@@ -89,9 +98,10 @@ async def update_meeting(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
     data: MeetingUpdate,
+    db=Depends(get_db),
 ):
     """Update meeting metadata."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         meeting = processing_service.update_meeting(meeting_id, current_user_id, data)
         return MeetingResponse.model_validate(meeting)
@@ -105,9 +115,10 @@ async def update_meeting(
 async def delete_meeting(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Delete a meeting."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         processing_service.delete_meeting(meeting_id, current_user_id)
     except NotFoundError as e:
@@ -121,8 +132,11 @@ async def upload_audio(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
     file: Annotated[UploadFile, File(...)],
+    db=Depends(get_db),
 ):
     """Upload audio file for meeting."""
+    # Authorize before reading or writing any client-supplied file.
+    AuthorizationService(db).require_meeting_admin(meeting_id, current_user_id)
     # Validate file type
     from pathlib import Path
     suffix = Path(file.filename).suffix.lower()
@@ -150,7 +164,7 @@ async def upload_audio(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.upload_audio(meeting_id, current_user_id, file_path, len(content))
     except NotFoundError as e:
@@ -164,8 +178,11 @@ async def upload_transcript(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
     file: Annotated[UploadFile, File(...)],
+    db=Depends(get_db),
 ):
     """Upload transcript file for meeting."""
+    # Authorize before reading or writing any client-supplied file.
+    AuthorizationService(db).require_meeting_admin(meeting_id, current_user_id)
     # Validate file type
     from pathlib import Path
     suffix = Path(file.filename).suffix.lower()
@@ -185,7 +202,7 @@ async def upload_transcript(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.upload_transcript(meeting_id, current_user_id, file_path)
     except NotFoundError as e:
@@ -199,9 +216,10 @@ async def start_processing(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
     background_tasks: BackgroundTasks,
+    db=Depends(get_db),
 ):
     """Queue meeting processing and return immediately."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         queued = processing_service.queue_processing(meeting_id, current_user_id)
         background_tasks.add_task(
@@ -225,9 +243,10 @@ async def start_processing(
 async def cancel_processing(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Stop an active or paused meeting workflow."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.cancel_processing(meeting_id, current_user_id)
     except NotFoundError as e:
@@ -240,9 +259,10 @@ async def cancel_processing(
 async def get_meeting_status(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Get meeting processing status."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.get_meeting_status(meeting_id, current_user_id)
     except NotFoundError as e:
@@ -254,9 +274,10 @@ async def get_meeting_status(
 async def get_review_content(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Get content for human review."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.get_review_content(meeting_id, current_user_id)
     except NotFoundError as e:
@@ -270,9 +291,10 @@ async def submit_review(
     meeting_id: UUID,
     data: ReviewRequest,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Submit human review decision."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.resume_processing(meeting_id, current_user_id, data)
     except NotFoundError as e:
@@ -288,9 +310,10 @@ async def submit_review(
 async def get_email_draft(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Get email draft for review."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.get_email_draft(meeting_id, current_user_id)
     except NotFoundError as e:
@@ -304,9 +327,10 @@ async def submit_email_review(
     meeting_id: UUID,
     data: EmailReviewRequest,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Submit email review decision."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.review_email(meeting_id, current_user_id, data)
     except NotFoundError as e:
@@ -322,9 +346,10 @@ async def submit_email_review(
 async def get_meeting_results(
     meeting_id: UUID,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    db=Depends(get_db),
 ):
     """Get meeting results."""
-    processing_service = ProcessingService()
+    processing_service = ProcessingService(db)
     try:
         return processing_service.get_meeting_results(meeting_id, current_user_id)
     except NotFoundError as e:
