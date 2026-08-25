@@ -1,457 +1,212 @@
+<div align="center">
+
 # Meeting Notes Agent
 
-A LangGraph-based meeting processing pipeline that transforms raw meeting transcripts or audio recordings into structured, actionable meeting notes with human-in-the-loop review checkpoints.
+### Turn every meeting into accountable, reviewable work.
 
-## Architecture Overview
+A multi-workspace AI collaboration platform that transforms meeting recordings and transcripts into structured summaries, decisions, insights, tasks, and approved follow-up emails.
 
-```
-┌─────────────┐
-│   INPUT     │  ← Meeting metadata + transcript/audio
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│ TRANSCRIBE  │  ← Whisper (local) or OpenAI API (audio → text)
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│   CLEAN     │  ← Remove filler words, fix formatting
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│  SUMMARIZE  │  ← LLM generates summary, decisions, action items
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│  REDACT     │  ← Remove PII, confidential info
-└──────┬──────┘
-       ▼
-┌─────────────┐     ┌──────────────────┐
-│ HUMAN REVIEW│────▶│  APPROVE / REJECT│  ← Checkpoint 1
-└──────┬──────┘     └──────────────────┘
-       │
-       ▼ (if approved)
-┌─────────────┐
-│  PM TASKS   │  ← Create structured task records
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│ DRAFT EMAIL │  ← Generate follow-up email
-└──────┬──────┘
-       ▼
-┌─────────────┐     ┌──────────────────┐
-│ EMAIL REVIEW│────▶│  APPROVE / REJECT│  ← Checkpoint 2
-└──────┬──────┘     └──────────────────┘
-       │
-       ▼ (if approved)
-┌─────────────┐
-│  SEND EMAIL │  ← Resend API
-└──────┬──────┘
-       ▼
-┌─────────────┐
-│   STORE     │  ← PostgreSQL persistence
-└─────────────┘
+[**Open the live application →**](https://meeting-notes-agent-ubaidullah1.vercel.app) · [Explore the architecture](#architecture) · [Run locally](#local-development)
+
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Alembic-4169E1?logo=postgresql&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-111827)
+
+</div>
+
+[![Meeting Notes Agent landing page](docs/images/landing-page.png)](https://meeting-notes-agent-ubaidullah1.vercel.app)
+
+## What it does
+
+Meeting Notes Agent turns raw conversations into a secure, team-scoped workflow:
+
+- Upload audio, upload a transcript, or paste transcript text.
+- Generate summaries, decisions, insights, and action items with LangGraph.
+- Review and revise AI output before it becomes final.
+- Assign structured tasks to project members and track their status.
+- Select meeting-specific recipients, review the email, and approve delivery.
+- Organize work across multiple isolated teams, projects, and meetings.
+- Use personal provider credentials or application credits without exposing secrets.
+
+## Product workflow
+
+```mermaid
+flowchart LR
+    A[Workspace] --> B[Project]
+    B --> C[Project members]
+    C --> D[Meeting participants]
+    D --> E[Audio or transcript]
+    E --> F[AI processing]
+    F --> G[Human review]
+    G --> H[Tasks and decisions]
+    H --> I[Email review]
+    I --> J[Selected recipients]
 ```
 
-## Project Structure
+Project membership, meeting participation, task assignment, and email recipients are separate relationships. That keeps collaboration flexible without weakening access control.
 
-```
-src/meeting_notes_agent/
-├── main.py                    # CLI entry point
-├── graph.py                   # LangGraph workflow definition
-├── state_schema.py            # Pydantic state model (single source of truth)
-├── observability.py           # LangSmith tracing configuration
-├── database/
-│   ├── __init__.py
-│   └── postgresdb.py          # PostgreSQL connection pool, checkpointer, schema
-├── Nodes/                     # Pipeline nodes (one per processing step)
-│   ├── i_Input.py             # Input validation & quota checking
-│   ├── ii_transcribe_audio.py # Audio transcription (Whisper/OpenAI)
-│   ├── iii_clean_transcript.py# Transcript cleaning
-│   ├── iv_summerize.py        # LLM summarization & extraction
-│   ├── v_extraction.py        # Decision/action item extraction
-│   ├── vi_redaction.py        # PII/confidential redaction
-│   ├── vii_PM_tasks.py        # Task record creation
-│   ├── viii_emailing.py       # Email draft generation
-│   ├── v_human_review.py      # Human review checkpoint 1 (after redaction)
-│   ├── send_email.py          # Email sending via Resend
-│   └── ix_store.py            # Database persistence
-├── llms/
-│   ├── API_Based/             # Cloud LLM providers
-│   │   ├── openai.py
-│   │   ├── groq.py
-│   │   └── openrouter.py
-│   ├── Local/                 # Local models
-│   │   └── hf/whisper.py      # Local Whisper transcription
-│   └── prompts/               # Prompt templates
-│       ├── summarize_prompt.py
-│       ├── redaction_prompt.py
-│       └── extract_decisions_prompt.py
-├── models/
-│   └── task.py                # Task data models
-├── storage/
-│   └── task_storage.py        # Local task file storage
-└── utils/
-    ├── email_utils.py         # Email formatting helpers
-    └── retry.py               # Retry logic with exponential backoff
+## Highlights
+
+### Collaborative workspaces
+
+- Create and switch between multiple teams without stale cross-team data.
+- Team-scoped Owner, Admin, and Member roles.
+- Project membership and participant-restricted meeting access.
+- Member dashboards focused on assigned tasks, meetings, projects, and decisions.
+
+### Meeting intelligence
+
+- Draft-first meeting creation with editable metadata and participants.
+- Asynchronous transcription and AI processing.
+- Structured summaries, decisions, insights, and action items.
+- Human approval, revision, rejection, and email-review checkpoints.
+- Processing states that remain consistent after refresh.
+
+### Production-minded security
+
+- Backend-enforced team, project, meeting, and task authorization.
+- IDOR protection for tenant-scoped resources.
+- Platform administration separated from team administration.
+- Encrypted user provider credentials with masked API responses.
+- Creator-based provider and billing ownership preserved during delegated processing.
+
+## Architecture
+
+| Layer | Technology | Responsibility |
+| --- | --- | --- |
+| Web application | React 18, TypeScript, Vite, Tailwind CSS | Role-aware workspace, meetings, reviews, tasks, and settings |
+| Client data | TanStack React Query, Axios | Team-scoped caching, API requests, and authenticated refresh |
+| API | FastAPI, Pydantic | REST endpoints, validation, authentication, and authorization |
+| Persistence | SQLAlchemy, PostgreSQL, Alembic | Tenant relationships, transactional data, and schema migrations |
+| AI workflow | LangGraph, OpenAI/OpenRouter integrations | Transcription, extraction, summarization, redaction, and task generation |
+| Delivery | Mailgun or Resend | Admin-approved meeting follow-up email |
+| Hosting | Vercel and Heroku | SPA delivery and API runtime |
+
+```text
+User
+└── TeamMembership → Team
+    └── Project
+        ├── ProjectMembership
+        └── Meeting
+            ├── Participants
+            ├── AI results and review state
+            ├── Tasks
+            └── Email recipients
 ```
 
-## Quick Start
+The API is served under `/api/v1`. Authenticated tenant requests carry an `X-Team-ID` header, which is validated against database membership rather than trusted directly.
+
+## Local development
 
 ### Prerequisites
 
-- Python 3.13+
-- PostgreSQL database
-- OpenAI API key (for LLM processing)
-- Resend API key (for email sending)
+- Python 3.13
+- [uv](https://docs.astral.sh/uv/)
+- Node.js 20+
+- PostgreSQL
+- FFmpeg for splitting and transcribing longer recordings
 
-### Installation
+### 1. Install the backend
 
-```powershell
-# Clone and navigate
-cd meeting-notes-agent
-
-# Create virtual environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Install dependencies
-pip install -e .
-
-# Or with uv (faster)
-uv sync
+```bash
+git clone https://github.com/ubaidull123/Meeting-Notes-Agent.git
+cd Meeting-Notes-Agent
+uv sync --locked
 ```
 
-### Configuration
+Copy `.env.example` to `.env`, then configure the required local values. At minimum, provide a PostgreSQL `DATABASE_URL`, JWT access and refresh secrets, and a credential-encryption key. Provider and email credentials are optional until those integrations are used.
 
-Create `.env` file from template:
+Never commit `.env` or real credentials.
 
-```powershell
-copy .env.example .env
+### 2. Apply database migrations
+
+```bash
+uv run alembic upgrade head
+uv run alembic current
 ```
 
-Edit `.env` with your credentials:
+Alembic owns schema evolution. Application startup verifies connectivity but does not replace migration execution.
 
-```env
-# Required
-OPENAI_API_KEY=sk-...
-OPENAI_CHAT_MODEL=gpt-4o-mini
-OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
-# Email: choose one provider
-EMAIL_PROVIDER=mailgun
-MAILGUN_API_KEY=your-new-mailgun-key
-MAILGUN_DOMAIN=your-mailgun-domain
-MAILGUN_BASE_URL=https://api.mailgun.net
-MAILGUN_FROM_EMAIL=Meeting Notes <postmaster@your-mailgun-domain>
-DATABASE_URL=postgresql://user:pass@localhost:5432/meeting_notes
+### 3. Start the API
 
-# Optional: LangSmith tracing
-LANGSMITH_API_KEY=lsv2_...
-LANGSMITH_TRACING=true
-LANGSMITH_PROJECT=meeting-notes-agent
+```bash
+uv run uvicorn meeting_notes_agent.api.main:app --reload --port 8000
 ```
 
-### Initialize Database
+Useful development endpoints:
 
-```powershell
-# Run once to create tables
-.\.venv\Scripts\python.exe -c "from meeting_notes_agent.database.postgresdb import init_db; init_db(); print('Database initialized')"
+- API documentation: `http://localhost:8000/docs`
+- Health: `http://localhost:8000/health`
+- Readiness: `http://localhost:8000/health/ready`
+
+### 4. Start the frontend
+
+```bash
+cd frontend
+npm ci
+npm run dev
 ```
 
-## Usage
+For local development, create `frontend/.env.local` with this public client configuration:
 
-### CLI Commands
-
-```powershell
-# Show help
-meeting-notes-agent --help
-# or
-.\.venv\Scripts\python.exe -m meeting_notes_agent.main --help
+```dotenv
+VITE_API_URL=http://localhost:8000/api/v1
 ```
 
-#### 1. Process Transcript Text (Fastest)
+Then open `http://localhost:5173`.
 
-```powershell
-meeting-notes-agent `
-  --transcript-text "Speaker 1: We decided to launch in October. Action: John to prepare checklist by Friday." `
-  --attendees "John Doe:john@company.com,Jane Smith:jane@company.com" `
-  --meeting-title "Launch Planning" `
-  --meeting-date 2026-08-20
+## Quality checks
+
+Run the backend suite:
+
+```bash
+uv run pytest
 ```
 
-#### 2. Process Audio File
+Run the frontend checks:
 
-```powershell
-meeting-notes-agent `
-  --audio-file "data/uploads/meeting.mp3" `
-  --attendees "John Doe:john@company.com" `
-  --meeting-title "Team Sync"
+```bash
+cd frontend
+npm run lint
+npm run test
+npm run build
 ```
 
-#### 3. Process Transcript File
+Validate migrations after model changes:
 
-```powershell
-meeting-notes-agent `
-  --transcript-file "transcripts/meeting.txt" `
-  --attendees "John Doe:john@company.com"
+```bash
+uv run alembic check
 ```
 
-#### 4. Load from JSON File
+The test suite covers authentication, billing, meeting processing, review and email flows, task behavior, PostgreSQL tenancy constraints, cross-team authorization, participant access, and multi-workspace meeting management.
 
-Create `input.json`:
-```json
-{
-  "meeting_title": "Q3 Planning",
-  "meeting_date": "2026-08-20",
-  "meeting_time": "10:00",
-  "project_name": "Product",
-  "transcript_text": "Speaker 1: ...",
-  "attendees": [
-    {"name": "John Doe", "email": "john@company.com"},
-    {"name": "Jane Smith", "email": "jane@company.com"}
-  ],
-  "agenda": ["Review Q2", "Plan Q3"],
-  "notes": "Quarterly planning"
-}
+## Project structure
+
+```text
+.
+├── alembic/                     # Versioned database migrations
+├── frontend/                    # React/Vite application
+├── src/meeting_notes_agent/
+│   ├── api/                     # FastAPI application and routers
+│   ├── auth/                    # Authentication dependencies and security
+│   ├── database/                # SQLAlchemy models and repositories
+│   ├── services/                # Authorization and domain services
+│   ├── Nodes/                   # LangGraph processing nodes
+│   └── graph.py                 # Meeting-processing workflow
+└── tests/                       # Backend, security, and tenancy tests
 ```
 
-Run:
-```powershell
-meeting-notes-agent --input-file input.json
-```
+## Deployment
 
-#### 5. Interactive Mode
+- The React SPA is deployed to Vercel with its API base URL compiled from `VITE_API_URL`.
+- The FastAPI service runs on Heroku and exposes liveness/readiness endpoints.
+- PostgreSQL schema changes are applied explicitly with `alembic upgrade head`.
+- CORS uses exact frontend origins; application secrets remain server-side.
 
-```powershell
-meeting-notes-agent --interactive
-```
-
-#### 6. Output Options
-
-```powershell
-# Quiet mode (summary + action items only)
-meeting-notes-agent --transcript-text "..." --attendees "..." --quiet
-
-# Save full state to JSON
-meeting-notes-agent --transcript-text "..." --attendees "..." --output-json result.json
-```
-
-## Human-in-the-Loop Review
-
-The workflow pauses at **two review checkpoints**:
-
-### Checkpoint 1: After Redaction
-- Shows redacted summary, decisions, action items
-- Options: **Approve** → continue, **Reject with instructions** → re-summarize, **Reject** → stop
-
-### Checkpoint 2: After Email Draft
-- Shows generated follow-up email
-- Options: **Approve & Send** → send email + store, **Reject with instructions** → redraft, **Reject** → stop
-
-### Resuming a Paused Workflow
-
-Workflows are checkpointed in PostgreSQL with a `thread_id`. To resume:
-
-```python
-# Using the same thread_id from the original run
-config = {"configurable": {"thread_id": "your-thread-id-here"}}
-result = graph.invoke({"human_review_decision": "approve"}, config=config)
-```
-
-Or via LangGraph Studio (see below).
-
-## LangGraph Studio (Visual Debugging)
-
-```powershell
-# Start the dev server
-.\scripts\run-langgraph.ps1
-```
-
-Opens: `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
-
-Features:
-- Visual graph execution
-- Step-through debugging
-- State inspection at each node
-- Resume interrupted runs
-- Run history
-
-## State Schema
-
-All data flows through a single `MeetingState` Pydantic model (`state_schema.py`):
-
-```python
-class MeetingState(BaseModel):
-    # Identification
-    meeting_id: str
-    meeting_title: str
-    meeting_date: date
-    meeting_time: Optional[str]
-    project_name: Optional[str]
-    user_id: Optional[int]
-
-    # Input (exactly one required)
-    audio_file_path: Optional[str]
-    transcript_file_path: Optional[str]
-    transcript_text: Optional[str]
-
-    # Attendees & context
-    attendees: List[Attendee]
-    agenda: List[str]
-    notes: Optional[str]
-
-    # Pipeline outputs
-    raw_transcription: Optional[str]
-    cleaned_transcription: Optional[str]
-    summary: Optional[str]
-    decisions: List[str]
-    action_items: List[str]
-
-    # Redacted outputs
-    redacted_transcription: Optional[str]
-    redacted_summary: Optional[str]
-    redacted_decisions: List[str]
-    redacted_action_items: List[str]
-
-    # Email
-    email_draft: Optional[str]
-    email_sent: bool
-    email_response: Optional[dict]
-
-    # Tasks
-    pm_tasks: List[Task]
-    task_collection: Optional[TaskCollection]
-
-    # Storage
-    stored: bool
-    storage_error: Optional[str]
-
-    # Human review
-    human_review_decision: Optional[str]
-    human_review_instructions: Optional[str]
-    email_review_decision: Optional[str]
-    email_review_instructions: Optional[str]
-
-    # Tracking
-    tokens_used_accrued: int
-```
-
-## Database Schema
-
-PostgreSQL tables created by `init_db()`:
-
-| Table | Purpose |
-|-------|---------|
-| `users` | Authentication (legacy, not used in CLI) |
-| `meetings` | Core meeting records with all pipeline outputs |
-| `attendees` | Meeting attendees (linked to meetings) |
-| `tasks` | PM task records extracted from meetings |
-| `user_quotas` | Monthly meeting limits & credits |
-| `user_credits` | Current credit balance |
-| `user_usage` | Monthly usage rollup |
-
-LangGraph checkpoints are stored in `checkpoints` table (managed by `PostgresSaver`).
-
-## LLM Providers
-
-Configure in `.env` or code:
-
-| Provider | Models | Use Case |
-|----------|--------|----------|
-| OpenAI | gpt-4o, gpt-4o-mini | Default, best quality |
-| Groq | llama-3.1-70b, mixtral | Fast, cost-effective |
-| OpenRouter | 100+ models | Model variety |
-| Local (HF) | whisper-large-v3 | Offline transcription |
-
-Default: **OpenAI** for chat and audio transcription, configurable through environment variables.
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | OpenAI API key for LLM |
-| `OPENAI_CHAT_MODEL` | No | Chat model (default: `gpt-4o-mini`) |
-| `OPENAI_TRANSCRIPTION_MODEL` | No | Audio transcription model (default: `gpt-4o-mini-transcribe`) |
-| `OPENAI_TIMEOUT_SECONDS` | No | Per-request timeout in seconds (default: `60`) |
-| `EMAIL_PROVIDER` | Yes | `mailgun` (recommended) or `resend` |
-| `MAILGUN_API_KEY` | When using Mailgun | Mailgun private API key |
-| `MAILGUN_DOMAIN` | When using Mailgun | Sending domain, including sandbox domains |
-| `MAILGUN_BASE_URL` | No | Mailgun API base URL (default: `https://api.mailgun.net`) |
-| `MAILGUN_FROM_EMAIL` | No | Sender; defaults to the domain's `postmaster` address |
-| `RESEND_API_KEY` | When using Resend | Resend API key for the alternative provider |
-| `RESEND_FROM_EMAIL` | When using Resend | Verified sender email |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `POSTGRES_USER` | No* | DB user (if not in DATABASE_URL) |
-| `POSTGRES_PASSWORD` | No* | DB password |
-| `POSTGRES_HOST` | No* | DB host (default: localhost) |
-| `POSTGRES_PORT` | No* | DB port (default: 5432) |
-| `POSTGRES_DB` | No* | DB name (default: meeting_notes) |
-| `LANGSMITH_API_KEY` | No | LangSmith tracing |
-| `LANGSMITH_TRACING` | No | Enable tracing (true/false) |
-| `LANGSMITH_PROJECT` | No | Project name in LangSmith |
-
-*Used to construct DATABASE_URL if not provided directly.
-
-## Development
-
-### Run Tests
-
-```powershell
-# No formal tests yet - run manually
-.\.venv\Scripts\python.exe -m meeting_notes_agent.main --interactive
-```
-
-### Add a New Node
-
-1. Create `src/meeting_notes_agent/Nodes/new_node.py`
-2. Define function accepting `state: MeetingState` → `dict`
-3. Add to `graph.py`: `graph.add_node("NewNode", new_node_fn)`
-4. Add edges: `graph.add_edge("PreviousNode", "NewNode")`
-
-### Prompt Engineering
-
-Prompts are in `llms/prompts/`. Each is a Python string template with `{variable}` placeholders.
-
-Example (`summarize_prompt.py`):
-```python
-SUMMARIZE_PROMPT = """
-You are an expert meeting summarizer. Analyze this transcript:
-
-{transcript}
-
-Provide:
-1. Summary (2-3 paragraphs)
-2. Key decisions (bullet list)
-3. Action items (bullet list with owners)
-"""
-```
-
-## Troubleshooting
-
-### "Checkpointer requires thread_id"
-Always provide a `thread_id` in config when invoking the graph:
-```python
-config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-result = graph.invoke(state, config=config)
-```
-
-### "DATABASE_URL not set"
-Ensure `.env` has valid PostgreSQL connection string.
-
-### "No module named 'meeting_notes_agent'"
-Install in editable mode: `pip install -e .` or `uv sync`
-
-### Audio transcription fails
-- Ensure ffmpeg is installed (required for audio processing)
-- On Heroku, install `https://github.com/heroku/heroku-buildpack-activestorage-preview.git`
-  before the Python buildpack so long recordings can be split automatically.
-- Check file format: MP3, WAV, M4A only
-- File size limit: ~100 MB
-
-### Email not sending
-- For Mailgun, verify `EMAIL_PROVIDER=mailgun`, `MAILGUN_API_KEY`, and `MAILGUN_DOMAIN`.
-- A Mailgun sandbox can send only to recipients you have authorized in Mailgun.
-- For Resend, verify `RESEND_API_KEY` and `RESEND_FROM_EMAIL`; its onboarding sender only delivers to the account owner.
+[Launch Meeting Notes Agent](https://meeting-notes-agent-ubaidullah1.vercel.app)
 
 ## License
 
-MIT License - See LICENSE file for details.
+Released under the [MIT License](LICENSE).
