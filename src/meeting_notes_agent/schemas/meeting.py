@@ -64,7 +64,7 @@ class MeetingCreate(MeetingBase):
 
 
 class MeetingUpdate(BaseModel):
-    """Meeting update schema (metadata only)."""
+    """Meeting update schema with draft-only source replacement."""
     title: Optional[str] = Field(default=None, min_length=1, max_length=500)
     meeting_date: Optional[date] = None
     meeting_time: Optional[str] = Field(default=None, max_length=50)
@@ -74,6 +74,7 @@ class MeetingUpdate(BaseModel):
     notes: Optional[str] = None
     attendees: Optional[List[AttendeeBase]] = None
     participant_user_ids: Optional[List[int]] = None
+    transcript_text: Optional[str] = None
 
 
 class MeetingListItem(BaseModel):
@@ -86,6 +87,8 @@ class MeetingListItem(BaseModel):
     team_id: UUID
     project_id: Optional[UUID]
     created_by: int
+    created_by_name: Optional[str] = None
+    participant_count: int = 0
     status: str
     created_at: datetime
     updated_at: datetime
@@ -100,6 +103,7 @@ class MeetingResponse(MeetingBase):
     team_id: UUID
     project_id: Optional[UUID]
     created_by: int
+    created_by_name: Optional[str] = None
     status: str
     audio_file_path: Optional[str]
     transcript_file_path: Optional[str]

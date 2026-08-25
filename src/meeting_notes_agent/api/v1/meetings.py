@@ -1,11 +1,11 @@
 """Meetings API routes."""
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query, File, UploadFile, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status, Query, File, UploadFile, Form
 from typing import Annotated, Optional, List
 from uuid import UUID
 
-from meeting_notes_agent.auth.dependencies import get_current_user_id, get_current_user, require_admin
+from meeting_notes_agent.auth.dependencies import enforce_active_team_resource_scope, get_current_user_id, get_current_user, require_admin
 from meeting_notes_agent.database import get_db
-from meeting_notes_agent.database.models import MeetingStatus
+from meeting_notes_agent.database.models import MeetingStatus, Project
 from meeting_notes_agent.schemas.meeting import (
     AttendeeBase,
     MeetingCreate,
@@ -37,20 +37,45 @@ from meeting_notes_agent.config.core.exceptions import (
 )
 from meeting_notes_agent.config.core.config import settings
 
-router = APIRouter(prefix="/meetings", tags=["Meetings"])
+router = APIRouter(prefix="/meetings", tags=["Meetings"], dependencies=[Depends(enforce_active_team_resource_scope)])
+
+
+def _meeting_response(meeting) -> MeetingResponse:
+    return MeetingResponse.model_validate(meeting).model_copy(
+        update={"created_by_name": meeting.creator.full_name if meeting.creator else None}
+    )
+
+
+def _meeting_list_item(meeting) -> MeetingListItem:
+    return MeetingListItem.model_validate(meeting).model_copy(
+        update={
+            "created_by_name": meeting.creator.full_name if meeting.creator else None,
+            "participant_count": len(meeting.attendees),
+        }
+    )
 
 
 @router.post("", response_model=MeetingResponse, status_code=status.HTTP_201_CREATED)
 async def create_meeting(
     data: MeetingCreate,
     current_user_id: Annotated[int, Depends(get_current_user_id)],
+    active_team_id: Annotated[UUID | None, Header(alias="X-Team-ID")] = None,
     db=Depends(get_db),
 ):
     """Create a new meeting."""
     processing_service = ProcessingService(db)
     try:
+        if active_team_id is not None:
+            if data.team_id is not None and data.team_id != active_team_id:
+                raise NotFoundError("Team not found")
+            if data.project_id is not None:
+                project = db.query(Project).filter(Project.id == data.project_id).first()
+                if project is not None and project.team_id != active_team_id:
+                    raise NotFoundError("Project not found")
         meeting = processing_service.create_meeting(current_user_id, data)
-        return MeetingResponse.model_validate(meeting)
+        return _meeting_response(meeting)
+    except NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -75,7 +100,7 @@ async def list_meetings(
         team_id=team_id,
         project_id=project_id,
     )
-    return [MeetingListItem.model_validate(m) for m in meetings]
+    return [_meeting_list_item(m) for m in meetings]
 
 
 @router.get("/{meeting_id}", response_model=MeetingResponse)
@@ -88,7 +113,7 @@ async def get_meeting(
     processing_service = ProcessingService(db)
     try:
         meeting = processing_service.get_meeting(meeting_id, current_user_id)
-        return MeetingResponse.model_validate(meeting)
+        return _meeting_response(meeting)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
@@ -104,7 +129,7 @@ async def update_meeting(
     processing_service = ProcessingService(db)
     try:
         meeting = processing_service.update_meeting(meeting_id, current_user_id, data)
-        return MeetingResponse.model_validate(meeting)
+        return _meeting_response(meeting)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValidationError as e:

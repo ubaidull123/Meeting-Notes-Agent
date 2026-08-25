@@ -25,7 +25,7 @@ export function DashboardPage() {
   const tasks = useQuery({ queryKey: ['tasks', activeTeam?.id, 'dashboard'], queryFn: () => tasksApi.listTasks({ team_id: activeTeam!.id, page_size: 100 }), enabled: Boolean(activeTeam) });
   const projects = useQuery({ queryKey: ['projects', activeTeam?.id], queryFn: () => projectsApi.listProjects(activeTeam!.id), enabled: Boolean(activeTeam) });
   const recent = (meetings.data ?? []).slice(0, 5);
-  const meetingDetails = useQueries({ queries: canManageActiveTeam ? [] : recent.map(meeting => ({ queryKey: ['meeting', meeting.id], queryFn: () => meetingsApi.getMeeting(meeting.id) })) });
+  const meetingDetails = useQueries({ queries: canManageActiveTeam ? [] : recent.map(meeting => ({ queryKey: ['meeting', activeTeam?.id, meeting.id], queryFn: () => meetingsApi.getMeeting(meeting.id), enabled: Boolean(activeTeam) })) });
   const updateTask = useMutation({
     mutationFn: ({ id, status }: { id: string; status: TaskStatus }) => tasksApi.updateTask(id, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', activeTeam?.id] }),

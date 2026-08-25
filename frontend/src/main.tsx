@@ -12,5 +12,5 @@ import './index.css';
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><TeamProvider><BrowserRouter><App /><Toaster richColors position="top-right" /></BrowserRouter></TeamProvider></AuthProvider></ThemeProvider></QueryClientProvider></React.StrictMode>,
+  <React.StrictMode><QueryClientProvider client={queryClient}><ThemeProvider><AuthProvider><BrowserRouter><TeamProvider><App /><Toaster richColors position="top-right" /></TeamProvider></BrowserRouter></AuthProvider></ThemeProvider></QueryClientProvider></React.StrictMode>,
 );

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CalendarDays, Check, Clock3, Download, Edit3, FileText, Mail, MoreHorizontal, Play, Square, Trash2, UserCheck, Users } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, Clock3, Download, Edit3, FileAudio, FileText, Mail, MoreHorizontal, Play, Square, Trash2, Upload, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { meetingsApi } from './api/meetings';
 import { tasksApi } from './api/tasks';
@@ -21,10 +21,10 @@ import { TaskTable } from './components/tasks/TaskTable';
 import { TaskStatus } from './types/task';
 import { useTeam } from './context/TeamContext';
 import { useAuth } from './context/AuthContext';
-import { primaryButton, secondaryButton, SectionCard, WorkspaceTabs } from './components/ui/Workspace';
+import { fieldClass, primaryButton, secondaryButton, SectionCard, WorkspaceTabs } from './components/ui/Workspace';
 
 const card = 'rounded-xl border border-border/80 bg-card p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-5';
-type MeetingTab = 'overview' | 'transcript' | 'summary' | 'tasks' | 'email' | 'activity';
+type MeetingTab = 'overview' | 'participants' | 'transcript' | 'summary' | 'tasks' | 'email' | 'activity';
 
 export function shouldPollMeetingStatus(status?: MeetingStatus | null) {
   return status === 'queued' || status === 'processing';
@@ -96,13 +96,15 @@ export function MeetingReviewPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editFocus, setEditFocus] = useState<'title' | 'notes'>('title');
   const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const [sourceText, setSourceText] = useState('');
 
   const meetingKey = useMemo(() => ['meeting', activeTeam?.id, meetingId] as const, [activeTeam?.id, meetingId]);
-  const meeting = useQuery({ queryKey: meetingKey, queryFn: () => meetingsApi.getMeeting(meetingId) });
+  const meeting = useQuery({ queryKey: meetingKey, queryFn: () => meetingsApi.getMeeting(meetingId), enabled: Boolean(activeTeam) });
   const canManage = canManageTeam(meeting.data?.team_id);
   const status = useQuery({
     queryKey: ['status', activeTeam?.id, meetingId],
     queryFn: () => meetingsApi.getStatus(meetingId),
+    enabled: Boolean(activeTeam),
     refetchInterval: query => shouldPollMeetingStatus(query.state.data?.status) ? 3000 : false,
   });
   const review = useQuery({ queryKey: ['review', activeTeam?.id, meetingId], queryFn: () => meetingsApi.getReviewContent(meetingId), enabled: canManage && isReviewOpen });
@@ -124,6 +126,10 @@ export function MeetingReviewPage() {
     queryClient.invalidateQueries({ queryKey: ['meetings'] });
   }, [meetingKey, queryClient, status.data?.status]);
 
+  useEffect(() => {
+    setSourceText(meeting.data?.transcript_text ?? '');
+  }, [meeting.data?.id, meeting.data?.transcript_text]);
+
   const start = useMutation({
     mutationFn: () => meetingsApi.startProcessing(meetingId),
     onSuccess: () => { toast.success('Processing started'); queryClient.invalidateQueries({ queryKey: ['status', activeTeam?.id, meetingId] }); queryClient.invalidateQueries({ queryKey: meetingKey }); },
@@ -140,6 +146,11 @@ export function MeetingReviewPage() {
   const updateMeeting = useMutation({
     mutationFn: (data: MeetingUpdateRequest) => meetingsApi.updateMeeting(meetingId, data),
     onSuccess: updated => { queryClient.setQueryData(meetingKey, updated); queryClient.invalidateQueries({ queryKey: ['meetings'] }); setIsEditOpen(false); toast.success('Meeting updated'); },
+    onError: error => toast.error(formatErrorMessage(error)),
+  });
+  const uploadSource = useMutation({
+    mutationFn: ({ kind, file }: { kind: 'audio' | 'transcript'; file: File }) => kind === 'audio' ? meetingsApi.uploadAudio(meetingId, file) : meetingsApi.uploadTranscript(meetingId, file),
+    onSuccess: () => { toast.success('Meeting source updated'); queryClient.invalidateQueries({ queryKey: meetingKey }); queryClient.invalidateQueries({ queryKey: ['status', activeTeam?.id, meetingId] }); queryClient.invalidateQueries({ queryKey: ['meetings', activeTeam?.id] }); },
     onError: error => toast.error(formatErrorMessage(error)),
   });
   const deleteMeeting = useMutation({
@@ -170,12 +181,14 @@ export function MeetingReviewPage() {
   const sourceType = getSourceType(data);
   const hasSummary = Boolean(data.summary || data.redacted_summary || data.decisions.length || data.action_items.length);
   const hasEmail = Boolean(data.email_draft || data.email_sent || currentStatus === 'awaiting_email_review');
-  const canStart = canManage && ['draft', 'uploaded', 'failed', 'cancelled'].includes(currentStatus);
+  const canStart = canManage && sourceType !== 'none' && ['draft', 'uploaded', 'failed', 'cancelled'].includes(currentStatus);
+  const canEditSource = canManage && ['draft', 'uploaded'].includes(currentStatus);
   const canReview = canManage && (currentStatus === 'awaiting_review' || currentStatus === 'revision_requested');
   const canReviewEmail = canManage && currentStatus === 'awaiting_email_review';
   const canStop = canManage && ['queued', 'processing', 'awaiting_review', 'revision_requested', 'awaiting_email_review'].includes(currentStatus);
   const tabs: Array<{ id: MeetingTab; label: string }> = [
     { id: 'overview', label: 'Overview' },
+    { id: 'participants', label: 'Participants' },
     ...(canManage && (sourceType !== 'none' || transcript) ? [{ id: 'transcript' as const, label: 'Transcript' }] : []),
     ...(hasSummary ? [{ id: 'summary' as const, label: 'Summary' }] : []),
     { id: 'tasks', label: 'Tasks' },
@@ -184,6 +197,7 @@ export function MeetingReviewPage() {
   ];
 
   const openEdit = (focus: 'title' | 'notes' = 'title') => { setEditFocus(focus); setIsEditOpen(true); setIsActionsOpen(false); };
+
   const downloadTranscript = () => {
     if (!transcript) return;
     const url = URL.createObjectURL(new Blob([transcript], { type: 'text/plain;charset=utf-8' }));
@@ -224,15 +238,17 @@ export function MeetingReviewPage() {
         </dl>
       </section>
       <div className="grid gap-5 lg:grid-cols-2">
-        <section className={card}><div className="flex items-center justify-between"><div><h2 className="font-semibold">Meeting participants</h2><p className="mt-1 text-sm text-muted-foreground">{data.attendees.length} participant{data.attendees.length === 1 ? '' : 's'}</p></div>{canManage && <button className="text-sm font-semibold text-teal-700 dark:text-teal-300" onClick={() => openEdit()}>Edit participants</button>}</div><div className="mt-4"><AttendeeList meeting={data} /></div></section>
         <section className={card}><div className="flex items-center justify-between"><h2 className="font-semibold">Notes</h2>{canManage && <button className="text-sm font-semibold text-teal-700 dark:text-teal-300" onClick={() => openEdit('notes')}>{data.notes ? 'Edit notes' : 'Add notes'}</button>}</div>{data.notes ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-foreground/85">{data.notes}</p> : <p className="mt-4 text-sm text-muted-foreground">No notes added.</p>}</section>
+        <section className={card}><h2 className="font-semibold">Ownership</h2><dl className="mt-4 space-y-3 text-sm"><div><dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Created by</dt><dd className="mt-1 font-medium">{data.created_by_name || 'Workspace member'}</dd></div><div><dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Project</dt><dd className="mt-1 font-medium">{data.project_name || 'Team-level meeting'}</dd></div></dl></section>
       </div>
+      {canEditSource && <section className={card}><div><h2 className="font-semibold">Meeting source</h2><p className="mt-1 text-sm text-muted-foreground">Add or replace the source before processing begins. Replacing it clears the other draft source.</p></div><div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]"><div><textarea aria-label="Pasted meeting transcript" className={fieldClass} rows={5} value={sourceText} onChange={event => setSourceText(event.target.value)} placeholder="Paste the meeting transcript here" /><button className={`mt-2 ${secondaryButton}`} disabled={updateMeeting.isPending || !sourceText.trim()} onClick={() => updateMeeting.mutate({ transcript_text: sourceText.trim() })}><FileText className="h-4 w-4" />Save pasted transcript</button></div><div className="flex flex-col gap-2 lg:w-56"><label className={`${secondaryButton} cursor-pointer justify-start`}><Upload className="h-4 w-4" />Upload transcript<input className="sr-only" type="file" accept=".txt,.md,.text,.transcript" disabled={uploadSource.isPending} onChange={event => { const file = event.target.files?.[0]; if (file) uploadSource.mutate({ kind: 'transcript', file }); event.target.value = ''; }} /></label><label className={`${secondaryButton} cursor-pointer justify-start`}><FileAudio className="h-4 w-4" />Upload audio<input className="sr-only" type="file" accept=".mp3,.wav,.m4a" disabled={uploadSource.isPending} onChange={event => { const file = event.target.files?.[0]; if (file) uploadSource.mutate({ kind: 'audio', file }); event.target.value = ''; }} /></label><p className="text-xs leading-5 text-muted-foreground">Transcript: TXT/MD<br />Audio: MP3/WAV/M4A</p></div></div></section>}
       {(canReview || canReviewEmail) && <section className="rounded-xl border border-purple-200 bg-purple-50 p-4 text-sm text-purple-950 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-100"><strong>{canReviewEmail ? 'Email approval required.' : 'Review required.'}</strong> {canReviewEmail ? 'Review the attendee email before it is sent.' : 'Check the generated summary and action items before the workflow continues.'}</section>}
       {canManage && <ProcessingTimeline status={currentStatus} currentStage={status.data?.current_stage} progressPercentage={status.data?.progress_percentage} errorMessage={status.data?.error ?? data.error_message} errorCode={data.error_code} sourceType={sourceType} hasTranscription={Boolean(data.raw_transcription || data.cleaned_transcription || sourceType === 'supplied_transcript')} />}
       <section className="rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground"><span className="font-medium text-foreground">Recent activity:</span> Updated {new Date(data.updated_at).toLocaleString()} &middot; {data.tokens_used.toLocaleString()} AI tokens used</section>
     </div>}
 
     {tab === 'transcript' && <section className={card}><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Transcript</h2><p className="mt-1 text-sm text-muted-foreground">{getSourceLabel(data)}</p></div>{transcript && <button className={secondaryButton} onClick={downloadTranscript}><Download className="h-4 w-4" />Download</button>}</div><p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-foreground/85">{transcript || 'The transcript will appear here when it is available.'}</p></section>}
+    {tab === 'participants' && <section className={card}><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Meeting participants</h2><p className="mt-1 text-sm text-muted-foreground">Participants have authenticated access to this restricted meeting. Email recipients are managed separately.</p></div>{canManage && <button className={secondaryButton} onClick={() => openEdit()}><Edit3 className="h-4 w-4" />Manage participants</button>}</div><div className="mt-5"><AttendeeList meeting={data} /></div></section>}
     {tab === 'summary' && <SummaryPanel meeting={data} canManage={canManage} />}
     {tab === 'tasks' && <TasksList meetingId={meetingId} teamId={data.team_id} canManage={canManage} />}
     {tab === 'email' && <section className={card}><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Attendee email</h2><p className="mt-1 text-sm text-muted-foreground">{data.email_sent ? 'Sent to attendees' : currentStatus === 'awaiting_email_review' ? 'Waiting for your approval' : 'Draft generated by the workflow'}</p></div>{canReviewEmail && <button className={primaryButton} onClick={() => setIsEmailReviewOpen(true)}>Review email</button>}</div><div className="mt-5 whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 text-sm leading-7">{data.email_draft || 'No email draft is available.'}</div></section>}

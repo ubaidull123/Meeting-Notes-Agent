@@ -530,17 +530,20 @@ class ProcessingService:
                 project_name=data.project_name,
             )
         else:
-            membership = (
+            memberships = (
                 db.query(TeamMembership)
                 .filter(
                     TeamMembership.user_id == user_id,
                     TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
                 )
                 .order_by(TeamMembership.created_at.asc())
-                .first()
+                .all()
             )
-            if membership is None:
+            if not memberships:
                 raise ValidationError("A team owner or admin membership is required")
+            if len(memberships) > 1:
+                raise ValidationError("Select a team before creating a meeting")
+            membership = memberships[0]
             team_id = membership.team_id
             project = self._resolve_project(
                 db,
@@ -602,6 +605,11 @@ class ProcessingService:
         meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
         update_data = data.model_dump(exclude_unset=True)
+        if meeting.status in {MeetingStatus.QUEUED, MeetingStatus.PROCESSING}:
+            raise ValidationError(
+                f"Meeting details cannot be changed while it is {meeting.status.value}"
+            )
+
         attendees_data = update_data.pop("attendees", None)
         participants_supplied = "participant_user_ids" in data.model_fields_set
         participant_user_ids = update_data.pop("participant_user_ids", None)
@@ -609,6 +617,22 @@ class ProcessingService:
         project_id = update_data.pop("project_id", None)
         project_name_supplied = "project_name" in update_data
         project_name = update_data.get("project_name")
+        transcript_supplied = "transcript_text" in data.model_fields_set
+        transcript_text = update_data.pop("transcript_text", None)
+        structure_changed = (
+            project_id_supplied
+            or project_name_supplied
+            or participants_supplied
+            or attendees_data is not None
+            or transcript_supplied
+        )
+        if structure_changed and meeting.status not in {
+            MeetingStatus.DRAFT,
+            MeetingStatus.UPLOADED,
+        }:
+            raise ValidationError(
+                "Project, participants, and source can only be changed before processing starts"
+            )
         if project_id_supplied or project_name_supplied:
             project = self._resolve_project(
                 db,
@@ -656,6 +680,16 @@ class ProcessingService:
         if update_data:
             meeting_repo.update(meeting, **update_data)
 
+        if transcript_supplied:
+            normalized_transcript = transcript_text.strip() if transcript_text else None
+            meeting_repo.update(
+                meeting,
+                transcript_text=normalized_transcript,
+                audio_file_path=None,
+                transcript_file_path=None,
+                status=MeetingStatus.DRAFT,
+            )
+
         if replacement_attendees is not None:
             attendee_repo.delete_by_meeting_id(meeting.id)
             attendee_repo.create_batch(meeting.id, replacement_attendees)
@@ -680,7 +714,13 @@ class ProcessingService:
         if suffix not in [".mp3", ".wav", ".m4a"]:
             raise ValidationError("Unsupported audio format. Supported formats: MP3, WAV, M4A")
 
-        meeting_repo.update(meeting, audio_file_path=file_path, status=MeetingStatus.UPLOADED)
+        meeting_repo.update(
+            meeting,
+            audio_file_path=file_path,
+            transcript_file_path=None,
+            transcript_text=None,
+            status=MeetingStatus.UPLOADED,
+        )
         db.commit()
 
         return AudioUploadResponse(
@@ -706,7 +746,13 @@ class ProcessingService:
         if suffix not in [".txt", ".md", ".text", ".transcript"]:
             raise ValidationError("Unsupported transcript format. Use TXT, MD, or a text transcript file.")
 
-        meeting_repo.update(meeting, transcript_file_path=file_path, status=MeetingStatus.UPLOADED)
+        meeting_repo.update(
+            meeting,
+            transcript_file_path=file_path,
+            audio_file_path=None,
+            transcript_text=None,
+            status=MeetingStatus.UPLOADED,
+        )
         db.commit()
 
         return TranscriptUploadResponse(
@@ -1316,8 +1362,14 @@ class ProcessingService:
 
         meeting = AuthorizationService(db).require_meeting_admin(meeting_id, user_id)
 
-        if meeting.status in [MeetingStatus.PROCESSING, MeetingStatus.AWAITING_REVIEW, MeetingStatus.AWAITING_EMAIL_REVIEW]:
-            raise ValidationError("Cannot delete meeting while processing")
+        if meeting.status in {
+            MeetingStatus.QUEUED,
+            MeetingStatus.PROCESSING,
+            MeetingStatus.AWAITING_REVIEW,
+            MeetingStatus.REVISION_REQUESTED,
+            MeetingStatus.AWAITING_EMAIL_REVIEW,
+        }:
+            raise ValidationError("Cannot delete a meeting during an active workflow")
 
         meeting_repo.delete(meeting)
         db.commit()

@@ -33,6 +33,8 @@ export interface MeetingListItem {
   team_id: string;
   project_id?: string | null;
   created_by: number;
+  created_by_name?: string | null;
+  participant_count: number;
   status: MeetingStatus;
   created_at: string;
   updated_at: string;
@@ -44,6 +46,7 @@ export interface Meeting {
   team_id: string;
   project_id?: string | null;
   created_by: number;
+  created_by_name?: string | null;
   title: string;
   meeting_date: string;
   meeting_time?: string | null;
@@ -102,6 +105,7 @@ export interface MeetingUpdateRequest {
   notes?: string | null;
   attendees?: Array<{ name: string; email: string }>;
   participant_user_ids?: number[];
+  transcript_text?: string | null;
 }
 
 export interface MeetingStatusResponse {

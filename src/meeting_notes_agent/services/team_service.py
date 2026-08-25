@@ -77,7 +77,7 @@ class TeamService:
             updated_at=invitation.updated_at,
         )
 
-    def create_team(self, user_id: int, data: TeamCreate) -> TeamResponse:
+    def create_team(self, user_id: int, data: TeamCreate) -> TeamListItem:
         db = self._get_db()
         user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
         if user is None:
@@ -92,7 +92,15 @@ class TeamService:
         db.add(TeamMembership(team_id=team.id, user_id=user_id, role=TeamRole.OWNER))
         db.commit()
         db.refresh(team)
-        return TeamResponse.model_validate(team)
+        return TeamListItem(
+            id=team.id,
+            name=team.name,
+            description=team.description,
+            role=TeamRole.OWNER,
+            created_by=team.created_by,
+            created_at=team.created_at,
+            updated_at=team.updated_at,
+        )
 
     def list_teams(self, user_id: int) -> list[TeamListItem]:
         db = self._get_db()

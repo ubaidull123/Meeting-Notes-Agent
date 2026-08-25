@@ -8,7 +8,10 @@ from jose import JWTError
 
 from meeting_notes_agent.auth.security import decode_access_token, decode_refresh_token
 from meeting_notes_agent.database import (
+    Meeting,
     PlatformRole,
+    Project,
+    Task,
     TeamMembership,
     TeamRole,
     UserRepository,
@@ -19,6 +22,51 @@ from meeting_notes_agent.config.core.exceptions import AuthenticationError, Auth
 
 # Security scheme
 security = HTTPBearer(auto_error=False)
+
+
+async def enforce_active_team_resource_scope(
+    request: Request,
+    active_team_id: Annotated[UUID | None, Header(alias="X-Team-ID")] = None,
+    db=Depends(get_db),
+) -> None:
+    """Keep ID-based resources inside the explicitly selected workspace.
+
+    Membership authorization still runs in each service. This dependency adds
+    the workspace-context boundary needed for users who legitimately belong to
+    more than one Team, and deliberately conceals mismatched resource IDs.
+    """
+    if active_team_id is None:
+        return
+
+    resource_team_id = request.path_params.get("team_id") or request.query_params.get("team_id")
+    project_id = request.path_params.get("project_id")
+    meeting_id = request.path_params.get("meeting_id")
+    task_id = request.path_params.get("task_id")
+    if project_id:
+        try:
+            parsed_project_id = UUID(str(project_id))
+        except ValueError:
+            return
+        project = db.query(Project).filter(Project.id == parsed_project_id).first()
+        resource_team_id = project.team_id if project else None
+    elif meeting_id:
+        try:
+            parsed_meeting_id = UUID(str(meeting_id))
+        except ValueError:
+            return
+        meeting = db.query(Meeting).filter(Meeting.id == parsed_meeting_id).first()
+        resource_team_id = meeting.team_id if meeting else None
+    elif task_id:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        resource_team_id = task.team_id if task else None
+
+    if resource_team_id is not None:
+        try:
+            scoped_team_id = UUID(str(resource_team_id))
+        except ValueError:
+            return  # Let FastAPI's typed parameter validation return 422.
+        if scoped_team_id != active_team_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
 
 
 async def get_current_user_optional(

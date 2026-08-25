@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Annotated, Optional, List
 from uuid import UUID
 
-from meeting_notes_agent.auth.dependencies import get_current_user_id, get_current_user
+from meeting_notes_agent.auth.dependencies import enforce_active_team_resource_scope, get_current_user_id, get_current_user
 from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import TaskStatus, TaskPriority
 from meeting_notes_agent.schemas.task import (
@@ -15,7 +15,7 @@ from meeting_notes_agent.schemas.task import (
 from meeting_notes_agent.services import TaskService
 from meeting_notes_agent.config.core.exceptions import NotFoundError, ValidationError
 
-router = APIRouter(prefix="/tasks", tags=["Tasks"])
+router = APIRouter(prefix="/tasks", tags=["Tasks"], dependencies=[Depends(enforce_active_team_resource_scope)])
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)

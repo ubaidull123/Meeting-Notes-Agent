@@ -64,22 +64,22 @@ export function ProjectPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { canManageTeam } = useTeam();
+  const { activeTeam, canManageTeam } = useTeam();
   const [tab, setTab] = useState<ProjectTab>('overview');
   const [memberId, setMemberId] = useState('');
   const [context, setContext] = useState('');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const project = useQuery({ queryKey: ['project', projectId], queryFn: () => projectsApi.getProject(projectId) });
+  const project = useQuery({ queryKey: ['project', activeTeam?.id, projectId], queryFn: () => projectsApi.getProject(projectId), enabled: Boolean(activeTeam) });
   const canManage = canManageTeam(project.data?.team_id);
-  const members = useQuery({ queryKey: ['project-members', projectId], queryFn: () => projectsApi.listMembers(projectId), enabled: tab === 'members' });
+  const members = useQuery({ queryKey: ['project-members', activeTeam?.id, projectId], queryFn: () => projectsApi.listMembers(projectId), enabled: Boolean(activeTeam) && tab === 'members' });
   const teamMembers = useQuery({ queryKey: ['team-members', project.data?.team_id], queryFn: () => teamsApi.listMembers(project.data!.team_id), enabled: Boolean(project.data && canManage && tab === 'members') });
   const meetings = useQuery({ queryKey: ['meetings', project.data?.team_id, projectId], queryFn: () => meetingsApi.listMeetings({ team_id: project.data!.team_id, project_id: projectId, page_size: 100 }), enabled: Boolean(project.data) && tab === 'meetings' });
   const tasks = useQuery({ queryKey: ['tasks', project.data?.team_id, projectId], queryFn: () => tasksApi.listTasks({ team_id: project.data!.team_id, project_id: projectId, page_size: 100 }), enabled: Boolean(project.data) && tab === 'tasks' });
 
   useEffect(() => { if (project.data) setContext(project.data.context ?? ''); }, [project.data]);
-  const update = useMutation({ mutationFn: (data: Partial<Project>) => projectsApi.updateProject(projectId, data), onSuccess: updated => { queryClient.setQueryData(['project', projectId], updated); queryClient.invalidateQueries({ queryKey: ['projects', updated.team_id] }); toast.success('Project updated'); }, onError: error => toast.error(formatErrorMessage(error)) });
-  const addMember = useMutation({ mutationFn: () => projectsApi.addMember(projectId, Number(memberId)), onSuccess: () => { setMemberId(''); queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }); toast.success('Project member added'); }, onError: error => toast.error(formatErrorMessage(error)) });
-  const removeMember = useMutation({ mutationFn: (userId: number) => projectsApi.removeMember(projectId, userId), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['project-members', projectId] }); toast.success('Project member removed'); }, onError: error => toast.error(formatErrorMessage(error)) });
+  const update = useMutation({ mutationFn: (data: Partial<Project>) => projectsApi.updateProject(projectId, data), onSuccess: updated => { queryClient.setQueryData(['project', activeTeam?.id, projectId], updated); queryClient.invalidateQueries({ queryKey: ['projects', updated.team_id] }); toast.success('Project updated'); }, onError: error => toast.error(formatErrorMessage(error)) });
+  const addMember = useMutation({ mutationFn: () => projectsApi.addMember(projectId, Number(memberId)), onSuccess: () => { setMemberId(''); queryClient.invalidateQueries({ queryKey: ['project-members', activeTeam?.id, projectId] }); toast.success('Project member added'); }, onError: error => toast.error(formatErrorMessage(error)) });
+  const removeMember = useMutation({ mutationFn: (userId: number) => projectsApi.removeMember(projectId, userId), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['project-members', activeTeam?.id, projectId] }); toast.success('Project member removed'); }, onError: error => toast.error(formatErrorMessage(error)) });
   const updateTask = useMutation({ mutationFn: ({ id, status }: { id: string; status: TaskStatus }) => tasksApi.updateTask(id, { status }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', project.data?.team_id, projectId] }), onError: error => toast.error(formatErrorMessage(error)) });
   const removeProject = useMutation({ mutationFn: () => projectsApi.deleteProject(projectId), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); navigate('/projects'); toast.success('Project deleted'); }, onError: error => toast.error(formatErrorMessage(error)) });
 

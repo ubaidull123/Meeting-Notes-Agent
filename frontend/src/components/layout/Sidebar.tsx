@@ -15,9 +15,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Building2,
-  ChevronsUpDown,
 } from 'lucide-react';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -31,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigateMobile,
 }) => {
   const { isAdmin } = useAuth();
-  const { activeTeam, canManageActiveTeam, selectTeam, teams } = useTeam();
+  const { canManageActiveTeam } = useTeam();
   const location = useLocation();
 
   const memberNavItems = [
@@ -83,17 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {activeTeam && <div className="border-b border-border/70 p-3">
-        {isCollapsed ? <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 text-xs font-bold text-primary" title={activeTeam.name}>{activeTeam.name.charAt(0).toUpperCase()}</div> : <div>
-          <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
-          <label className="relative flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 shadow-sm transition-colors hover:border-foreground/20">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Building2 className="h-3.5 w-3.5" /></span>
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-foreground">{activeTeam.name}</span><span className="block text-[10px] capitalize text-muted-foreground">{activeTeam.role} access</span></span>
-            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <select aria-label="Current team" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" value={activeTeam.id} onChange={event => selectTeam(event.target.value)}>{teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select>
-          </label>
-        </div>}
-      </div>}
+      <div className="border-b border-border/70 p-3"><WorkspaceSwitcher collapsed={isCollapsed} /></div>
 
       {/* Navigation Sections */}
       <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">

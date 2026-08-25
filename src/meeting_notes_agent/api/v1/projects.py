@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from meeting_notes_agent.auth.dependencies import get_current_user
+from meeting_notes_agent.auth.dependencies import enforce_active_team_resource_scope, get_current_user
 from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import User
 from meeting_notes_agent.schemas.project import (
@@ -18,7 +18,7 @@ from meeting_notes_agent.schemas.project import (
 from meeting_notes_agent.services.project_service import ProjectService
 
 
-router = APIRouter(tags=["Projects"])
+router = APIRouter(tags=["Projects"], dependencies=[Depends(enforce_active_team_resource_scope)])
 
 
 @router.post(

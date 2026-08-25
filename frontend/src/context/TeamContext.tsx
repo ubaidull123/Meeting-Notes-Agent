@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { teamsApi } from '../api/teams';
 import { setActiveTeamScope } from '../api/client';
 import { Team, TeamRole } from '../types/team';
@@ -12,16 +13,32 @@ interface TeamContextValue {
   isLoading: boolean;
   canManageActiveTeam: boolean;
   selectTeam: (teamId: string) => void;
+  createTeam: (data: { name: string; description?: string | null }) => Promise<Team>;
   roleForTeam: (teamId?: string | null) => TeamRole | null;
   canManageTeam: (teamId?: string | null) => boolean;
   refreshTeams: () => Promise<void>;
 }
 
 const TeamContext = createContext<TeamContextValue | undefined>(undefined);
-const scopedQueryRoots = new Set(['projects', 'meetings', 'tasks', 'team-members', 'project-members']);
+const scopedQueryRoots = new Set([
+  'dashboard',
+  'projects',
+  'project',
+  'meetings',
+  'meeting',
+  'status',
+  'review',
+  'email-review',
+  'tasks',
+  'team-members',
+  'project-members',
+  'meeting-participant-options',
+  'task-assignee-options',
+]);
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
   const teamsQuery = useQuery({
@@ -42,15 +59,32 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setActiveTeamId(current => teams.some(team => team.id === current) ? current : next);
   }, [teams, user]);
 
-  const selectTeam = useCallback((teamId: string) => {
-    if (!user || !teams.some(team => team.id === teamId)) return;
+  const activateTeam = useCallback((teamId: string) => {
+    if (!user) return;
     window.localStorage.setItem(`meeting-notes-active-team:${user.id}`, teamId);
     setActiveTeamScope(teamId);
     queryClient.removeQueries({
       predicate: query => scopedQueryRoots.has(String(query.queryKey[0])),
     });
     setActiveTeamId(teamId);
-  }, [queryClient, teams, user]);
+    navigate('/dashboard');
+  }, [navigate, queryClient, user]);
+
+  const selectTeam = useCallback((teamId: string) => {
+    if (!teams.some(team => team.id === teamId) || teamId === activeTeamId) return;
+    activateTeam(teamId);
+  }, [activateTeam, activeTeamId, teams]);
+
+  const createTeam = useCallback(async (data: { name: string; description?: string | null }) => {
+    if (!user) throw new Error('Sign in before creating a workspace.');
+    const created = await teamsApi.createTeam(data);
+    queryClient.setQueryData<Team[]>(['teams', user.id], current => [
+      ...(current ?? []).filter(team => team.id !== created.id),
+      created,
+    ].sort((left, right) => left.name.localeCompare(right.name)));
+    activateTeam(created.id);
+    return created;
+  }, [activateTeam, queryClient, user]);
 
   const activeTeam = teams.find(team => team.id === activeTeamId) ?? null;
   useEffect(() => {
@@ -75,6 +109,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     isLoading: isAuthenticated && teamsQuery.isLoading,
     canManageActiveTeam: canManageTeam(activeTeam?.id),
     selectTeam,
+    createTeam,
     roleForTeam,
     canManageTeam,
     refreshTeams,

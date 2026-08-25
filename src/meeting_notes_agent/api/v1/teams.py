@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from meeting_notes_agent.auth.dependencies import get_current_user
+from meeting_notes_agent.auth.dependencies import enforce_active_team_resource_scope, get_current_user
 from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import User
 from meeting_notes_agent.schemas.team import (
@@ -20,10 +20,10 @@ from meeting_notes_agent.schemas.team import (
 from meeting_notes_agent.services.team_service import TeamService
 
 
-router = APIRouter(prefix="/teams", tags=["Teams"])
+router = APIRouter(prefix="/teams", tags=["Teams"], dependencies=[Depends(enforce_active_team_resource_scope)])
 
 
-@router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=TeamListItem, status_code=status.HTTP_201_CREATED)
 async def create_team(
     data: TeamCreate,
     current_user: Annotated[User, Depends(get_current_user)],
