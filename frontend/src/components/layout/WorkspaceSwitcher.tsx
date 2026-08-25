@@ -19,8 +19,15 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
     const close = (event: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) setIsOpen(false);
     };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
     document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
   }, []);
 
   const submit = async (event: FormEvent) => {
@@ -41,7 +48,7 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
     }
   };
 
-  return <div ref={rootRef} className="relative">
+  return <div ref={rootRef} className="relative min-w-0">
     {!collapsed && <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Current workspace</p>}
     <button
       type="button"
@@ -58,9 +65,14 @@ export function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
       {!collapsed && <><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-foreground">{activeTeam?.name || 'Choose workspace'}</span><span className="block text-[10px] capitalize text-muted-foreground">{activeTeam ? `${activeTeam.role} access` : 'No workspace selected'}</span></span><ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /></>}
     </button>
 
-    {isOpen && <div role="menu" className={cn('absolute z-40 mt-2 w-64 overflow-hidden rounded-xl border border-border bg-popover p-1.5 shadow-xl', collapsed ? 'left-full bottom-0 ml-2' : 'left-0 top-full')}>
+    {isOpen && <div role="menu" className={cn(
+      'absolute z-50 overflow-hidden rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl ring-1 ring-slate-950/5',
+      collapsed
+        ? 'bottom-0 left-full ml-2 w-64 max-w-[calc(100vw-5.5rem)]'
+        : 'inset-x-0 top-full mt-2 w-full',
+    )}>
       <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Switch workspace</p>
-      <div className="max-h-64 overflow-y-auto">
+      <div className="max-h-[calc(100vh-14rem)] overflow-y-auto overscroll-contain">
         {teams.map(team => <button key={team.id} type="button" role="menuitem" onClick={() => { selectTeam(team.id); setIsOpen(false); }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-muted">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">{team.name.charAt(0).toUpperCase()}</span>
           <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{team.name}</span><span className="block text-[10px] capitalize text-muted-foreground">{team.role}</span></span>

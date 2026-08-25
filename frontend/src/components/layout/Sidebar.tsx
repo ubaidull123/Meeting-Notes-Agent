@@ -65,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       className={cn(
-        'sticky top-0 flex h-screen flex-col select-none border-r border-border/80 bg-card transition-all duration-200 ease-in-out',
+        'sticky top-0 isolate flex h-screen flex-col overflow-visible select-none border-r border-border/80 bg-card transition-all duration-200 ease-in-out',
         isCollapsed ? 'w-[4.25rem]' : 'w-[17rem]'
       )}
     >
@@ -82,10 +82,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      <div className="border-b border-border/70 p-3"><WorkspaceSwitcher collapsed={isCollapsed} /></div>
+      <div className="relative z-30 shrink-0 border-b border-border/70 p-3">
+        <WorkspaceSwitcher collapsed={isCollapsed} />
+      </div>
 
       {/* Navigation Sections */}
-      <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+      <div className="relative z-0 flex-1 space-y-6 overflow-y-auto px-3 py-4">
         {/* User Navigation */}
         <div className="space-y-1">
           {!isCollapsed && (
