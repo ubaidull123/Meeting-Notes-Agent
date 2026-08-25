@@ -7,6 +7,7 @@ import {
   Team,
   TeamCreateRequest,
   TeamMember,
+  TeamMemberAddRequest,
   TeamRole,
   TeamUpdateRequest,
 } from '../types/team';
@@ -16,9 +17,10 @@ export const teamsApi = {
   createTeam: async (data: TeamCreateRequest): Promise<Team> => (await apiClient.post<Team>('/teams', data)).data,
   updateTeam: async (teamId: string, data: TeamUpdateRequest): Promise<Team> => (await apiClient.patch<Team>(`/teams/${teamId}`, data)).data,
   listMembers: async (teamId: string): Promise<TeamMember[]> => (await apiClient.get<TeamMember[]>(`/teams/${teamId}/members`)).data,
-  addMember: async (teamId: string, userId: number, role: TeamRole = 'member'): Promise<TeamMember> => (await apiClient.post<TeamMember>(`/teams/${teamId}/members`, { user_id: userId, role })).data,
+  addMember: async (teamId: string, data: TeamMemberAddRequest): Promise<TeamMember> => (await apiClient.post<TeamMember>(`/teams/${teamId}/members`, data)).data,
   updateMemberRole: async (teamId: string, userId: number, role: TeamRole): Promise<TeamMember> => (await apiClient.patch<TeamMember>(`/teams/${teamId}/members/${userId}`, { role })).data,
   removeMember: async (teamId: string, userId: number): Promise<void> => { await apiClient.delete(`/teams/${teamId}/members/${userId}`); },
+  revokeInvitation: async (teamId: string, invitationId: string): Promise<void> => { await apiClient.delete(`/teams/${teamId}/invitations/${invitationId}`); },
 };
 
 export const projectsApi = {

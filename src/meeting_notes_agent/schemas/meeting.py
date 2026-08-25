@@ -9,6 +9,9 @@ class AttendeeBase(BaseModel):
     """Attendee base schema."""
     name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
+    user_id: Optional[int] = None
+    title: Optional[str] = Field(default=None, max_length=255)
+    department: Optional[str] = Field(default=None, max_length=255)
 
 
 class AttendeeResponse(AttendeeBase):
@@ -28,7 +31,7 @@ class MeetingBase(BaseModel):
     project_name: Optional[str] = Field(default=None, max_length=255, description="Project name")
     agenda: List[str] = Field(default_factory=list, description="Agenda items")
     notes: Optional[str] = Field(default=None, description="Additional notes")
-    attendees: List[AttendeeBase] = Field(..., min_length=1, description="Meeting attendees")
+    attendees: List[AttendeeBase] = Field(default_factory=list, description="Legacy/free-text meeting attendees")
 
 
 class MeetingCreate(MeetingBase):
@@ -39,6 +42,7 @@ class MeetingCreate(MeetingBase):
     transcript_text: Optional[str] = None
     team_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
+    participant_user_ids: Optional[List[int]] = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -69,6 +73,7 @@ class MeetingUpdate(BaseModel):
     agenda: Optional[List[str]] = None
     notes: Optional[str] = None
     attendees: Optional[List[AttendeeBase]] = None
+    participant_user_ids: Optional[List[int]] = None
 
 
 class MeetingListItem(BaseModel):
@@ -111,6 +116,7 @@ class MeetingResponse(MeetingBase):
     email_draft: Optional[str]
     email_sent: bool
     email_response: Optional[dict]
+    restrict_to_participants: bool
     tokens_used: int
     thread_id: Optional[str]
     error_code: Optional[str]
@@ -231,6 +237,7 @@ class EmailDraftResponse(BaseModel):
     redacted_summary: str
     redacted_decisions: List[str]
     redacted_action_items: List[str]
+    participants: List["EmailParticipantResponse"] = Field(default_factory=list)
     delivery_error: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -240,6 +247,10 @@ class EmailReviewRequest(BaseModel):
     """Email review request schema."""
     decision: Literal["approve", "reject", "revise"] = Field(..., description="Email review decision")
     instructions: Optional[str] = Field(default=None, description="Revision instructions (required for revise)")
+    recipient_user_ids: Optional[List[int]] = Field(
+        default=None,
+        description="Meeting participant user IDs selected for this meeting's follow-up",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -257,6 +268,16 @@ class EmailSendResponse(BaseModel):
     sent: bool
     response: Optional[dict]
     message: str
+
+
+class EmailParticipantResponse(BaseModel):
+    user_id: int
+    name: str
+    email: str
+    title: Optional[str] = None
+    department: Optional[str] = None
+    selected: bool = False
+    delivery_status: Optional[str] = None
 
 
 # Task schemas (will be defined in task.py but imported here)
@@ -281,3 +302,4 @@ class TaskResponse(BaseModel):
 
 # Forward references
 MeetingResultResponse.model_rebuild()
+EmailDraftResponse.model_rebuild()

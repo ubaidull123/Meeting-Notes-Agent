@@ -37,13 +37,24 @@ class ProjectService:
         return self.db or next(get_db())
 
     @staticmethod
-    def _member_response(membership: ProjectMembership) -> ProjectMemberResponse:
+    def _member_response(db, membership: ProjectMembership) -> ProjectMemberResponse:
+        team_profile = (
+            db.query(TeamMembership)
+            .filter(
+                TeamMembership.team_id == membership.project.team_id,
+                TeamMembership.user_id == membership.user_id,
+            )
+            .first()
+        )
         return ProjectMemberResponse(
             id=membership.id,
             project_id=membership.project_id,
             user_id=membership.user_id,
             email=membership.user.email,
             full_name=membership.user.full_name,
+            title=team_profile.title if team_profile else None,
+            department=team_profile.department if team_profile else None,
+            status="active",
             is_active=membership.user.is_active,
             created_at=membership.created_at,
         )
@@ -149,7 +160,7 @@ class ProjectService:
             .order_by(User.full_name.asc())
             .all()
         )
-        return [self._member_response(item) for item in memberships]
+        return [self._member_response(db, item) for item in memberships]
 
     def add_member(
         self, project_id: UUID, member_user_id: int, current_user_id: int
@@ -176,7 +187,7 @@ class ProjectService:
         db.add(membership)
         db.commit()
         db.refresh(membership)
-        return self._member_response(membership)
+        return self._member_response(db, membership)
 
     def remove_member(
         self, project_id: UUID, member_user_id: int, current_user_id: int

@@ -20,7 +20,9 @@ from meeting_notes_agent.database import (
     get_db,
 )
 from meeting_notes_agent.database.models import (
+    Attendee as AttendeeModel,
     Meeting,
+    MeetingEmailRecipient,
     MeetingStatus,
     Project,
     ProjectMembership,
@@ -29,6 +31,7 @@ from meeting_notes_agent.database.models import (
     TaskPriority,
     TeamMembership,
     TeamRole,
+    User,
 )
 from meeting_notes_agent.config.core.exceptions import (
     InsufficientCreditsError,
@@ -56,6 +59,7 @@ from meeting_notes_agent.schemas.meeting import (
     ReviewRequest,
     ReviewResponse,
     EmailDraftResponse,
+    EmailParticipantResponse,
     EmailReviewRequest,
     EmailSendResponse,
     MeetingResultResponse,
@@ -79,6 +83,93 @@ class ProcessingService:
         if self.db:
             return self.db
         return next(get_db())
+
+    @staticmethod
+    def _participant_rows(
+        db,
+        *,
+        team_id: UUID,
+        project_id: UUID | None,
+        participant_user_ids: list[int],
+    ) -> list[dict[str, Any]]:
+        requested_ids = list(dict.fromkeys(participant_user_ids))
+        if not requested_ids:
+            raise ValidationError("Select at least one meeting participant")
+        query = (
+            db.query(User, TeamMembership)
+            .join(
+                TeamMembership,
+                (TeamMembership.user_id == User.id)
+                & (TeamMembership.team_id == team_id),
+            )
+            .filter(User.id.in_(requested_ids), User.is_active.is_(True))
+        )
+        if project_id is not None:
+            query = query.join(
+                ProjectMembership,
+                (ProjectMembership.user_id == User.id)
+                & (ProjectMembership.project_id == project_id),
+            )
+        rows = query.all()
+        by_user_id = {user.id: (user, membership) for user, membership in rows}
+        if set(requested_ids) != set(by_user_id):
+            raise ValidationError(
+                "Every meeting participant must be an active member of the selected Project"
+                if project_id is not None
+                else "Every meeting participant must be an active member of the selected Team"
+            )
+        return [
+            {
+                "user_id": user.id,
+                "name": user.full_name,
+                "email": user.email,
+                "title": membership.title,
+                "department": membership.department,
+            }
+            for user_id in requested_ids
+            for user, membership in [by_user_id[user_id]]
+        ]
+
+    @staticmethod
+    def _legacy_attendee_rows(
+        db,
+        *,
+        team_id: UUID,
+        project_id: UUID | None,
+        attendees: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for attendee in attendees:
+            email = str(attendee["email"]).strip().lower()
+            query = (
+                db.query(User, TeamMembership)
+                .join(
+                    TeamMembership,
+                    (TeamMembership.user_id == User.id)
+                    & (TeamMembership.team_id == team_id),
+                )
+                .filter(User.email == email, User.is_active.is_(True))
+            )
+            if project_id is not None:
+                query = query.join(
+                    ProjectMembership,
+                    (ProjectMembership.user_id == User.id)
+                    & (ProjectMembership.project_id == project_id),
+                )
+            match = query.first()
+            user, membership = match if match else (None, None)
+            result.append(
+                {
+                    "user_id": user.id if user else None,
+                    "name": attendee["name"],
+                    "email": email,
+                    "title": membership.title if membership else attendee.get("title"),
+                    "department": (
+                        membership.department if membership else attendee.get("department")
+                    ),
+                }
+            )
+        return result
 
     @staticmethod
     def _resolve_project(
@@ -474,13 +565,28 @@ class ProcessingService:
             transcript_text=data.transcript_text,
             agenda=data.agenda or [],
             notes=data.notes,
+            restrict_to_participants=data.participant_user_ids is not None,
             status=MeetingStatus.DRAFT,
         )
 
         meeting = meeting_repo.create(meeting)
 
-        # Create attendees
-        attendees_data = [{"name": a.name, "email": a.email} for a in data.attendees]
+        if data.participant_user_ids is not None:
+            attendees_data = self._participant_rows(
+                db,
+                team_id=team_id,
+                project_id=project.id if project else None,
+                participant_user_ids=data.participant_user_ids,
+            )
+        else:
+            if not data.attendees:
+                raise ValidationError("Select at least one meeting participant")
+            attendees_data = self._legacy_attendee_rows(
+                db,
+                team_id=team_id,
+                project_id=project.id if project else None,
+                attendees=[item.model_dump() for item in data.attendees],
+            )
         attendee_repo.create_batch(meeting.id, attendees_data)
 
         db.commit()
@@ -497,6 +603,8 @@ class ProcessingService:
 
         update_data = data.model_dump(exclude_unset=True)
         attendees_data = update_data.pop("attendees", None)
+        participants_supplied = "participant_user_ids" in data.model_fields_set
+        participant_user_ids = update_data.pop("participant_user_ids", None)
         project_id_supplied = "project_id" in update_data
         project_id = update_data.pop("project_id", None)
         project_name_supplied = "project_name" in update_data
@@ -512,15 +620,45 @@ class ProcessingService:
             update_data["project_id"] = project.id if project else None
             update_data["project_name"] = project.name if project else project_name
 
+        target_project_id = update_data.get("project_id", meeting.project_id)
+        replacement_attendees = None
+        if participants_supplied or attendees_data is not None:
+            if meeting.email_recipients:
+                raise ValidationError(
+                    "Meeting participants cannot be changed after email recipient review has begun"
+                )
+            if participants_supplied:
+                replacement_attendees = self._participant_rows(
+                    db,
+                    team_id=meeting.team_id,
+                    project_id=target_project_id,
+                    participant_user_ids=participant_user_ids or [],
+                )
+                update_data["restrict_to_participants"] = True
+            else:
+                if not attendees_data:
+                    raise ValidationError("At least one attendee is required")
+                replacement_attendees = self._legacy_attendee_rows(
+                    db,
+                    team_id=meeting.team_id,
+                    project_id=target_project_id,
+                    attendees=attendees_data,
+                )
+        elif (project_id_supplied or project_name_supplied) and meeting.restrict_to_participants:
+            existing_ids = [item.user_id for item in meeting.attendees if item.user_id is not None]
+            self._participant_rows(
+                db,
+                team_id=meeting.team_id,
+                project_id=target_project_id,
+                participant_user_ids=existing_ids,
+            )
+
         if update_data:
             meeting_repo.update(meeting, **update_data)
 
-        if attendees_data is not None:
-            # Validate attendees
-            if len(attendees_data) == 0:
-                raise ValidationError("At least one attendee is required")
+        if replacement_attendees is not None:
             attendee_repo.delete_by_meeting_id(meeting.id)
-            attendee_repo.create_batch(meeting.id, attendees_data)
+            attendee_repo.create_batch(meeting.id, replacement_attendees)
 
         db.commit()
         db.refresh(meeting)
@@ -816,6 +954,27 @@ class ProcessingService:
         if meeting.status not in [MeetingStatus.AWAITING_EMAIL_REVIEW]:
             raise ValidationError(f"Meeting not awaiting email review. Current status: {meeting.status.value}")
 
+        recipients_by_attendee = {
+            recipient.attendee_id: recipient for recipient in meeting.email_recipients
+        }
+        participants = [
+            EmailParticipantResponse(
+                user_id=participant.user_id,
+                name=participant.name,
+                email=participant.email,
+                title=participant.title,
+                department=participant.department,
+                selected=participant.id in recipients_by_attendee,
+                delivery_status=(
+                    recipients_by_attendee[participant.id].status
+                    if participant.id in recipients_by_attendee
+                    else None
+                ),
+            )
+            for participant in meeting.attendees
+            if participant.user_id is not None
+        ]
+
         return EmailDraftResponse(
             meeting_id=meeting.id,
             meeting_title=meeting.title,
@@ -823,12 +982,96 @@ class ProcessingService:
             redacted_summary=meeting.redacted_summary or "",
             redacted_decisions=meeting.redacted_decisions or [],
             redacted_action_items=meeting.redacted_action_items or [],
+            participants=participants,
             delivery_error=(
                 meeting.email_response.get("error")
                 if isinstance(meeting.email_response, dict)
                 else None
             ),
         )
+
+    @staticmethod
+    def _sync_email_recipients(
+        db,
+        *,
+        meeting: Meeting,
+        selected_by: int,
+        recipient_user_ids: list[int],
+    ) -> None:
+        requested = set(recipient_user_ids)
+        if not requested:
+            raise ValidationError("Select at least one email recipient")
+        participants = {
+            participant.user_id: participant
+            for participant in meeting.attendees
+            if participant.user_id is not None
+        }
+        if requested - set(participants):
+            raise ValidationError(
+                "Email recipients must be registered participants in this meeting"
+            )
+
+        existing = {
+            recipient.attendee_id: recipient
+            for recipient in db.query(MeetingEmailRecipient)
+            .filter(MeetingEmailRecipient.meeting_id == meeting.id)
+            .all()
+        }
+        selected_attendee_ids = {participants[user_id].id for user_id in requested}
+        for attendee_id, recipient in existing.items():
+            if attendee_id not in selected_attendee_ids:
+                if recipient.status == "sent":
+                    raise ValidationError("A delivered recipient cannot be removed")
+                db.delete(recipient)
+
+        for user_id in requested:
+            participant = participants[user_id]
+            recipient = existing.get(participant.id)
+            if recipient is None:
+                db.add(
+                    MeetingEmailRecipient(
+                        meeting_id=meeting.id,
+                        attendee_id=participant.id,
+                        user_id=user_id,
+                        email=participant.email,
+                        status="pending",
+                        selected_by=selected_by,
+                    )
+                )
+            elif recipient.status != "sent":
+                recipient.user_id = user_id
+                recipient.email = participant.email
+                recipient.status = "pending"
+                recipient.selected_by = selected_by
+                recipient.selected_at = datetime.now(timezone.utc)
+                recipient.delivery_error = None
+                recipient.delivery_response = None
+
+        db.flush()
+
+    @staticmethod
+    def _finish_pending_recipient_audit(db, meeting: Meeting) -> None:
+        pending = (
+            db.query(MeetingEmailRecipient)
+            .filter(
+                MeetingEmailRecipient.meeting_id == meeting.id,
+                MeetingEmailRecipient.status == "pending",
+            )
+            .all()
+        )
+        if not pending:
+            return
+        response = meeting.email_response if isinstance(meeting.email_response, dict) else None
+        error = response.get("error") if response else None
+        for recipient in pending:
+            recipient.delivery_response = response
+            if meeting.email_sent:
+                recipient.status = "sent"
+                recipient.sent_at = datetime.now(timezone.utc)
+                recipient.delivery_error = None
+            elif error:
+                recipient.status = "failed"
+                recipient.delivery_error = error
 
     def review_email(self, meeting_id: UUID, user_id: int, review_data: EmailReviewRequest) -> EmailSendResponse:
         """Review and optionally send email."""
@@ -842,6 +1085,27 @@ class ProcessingService:
 
         if meeting.status not in [MeetingStatus.AWAITING_EMAIL_REVIEW]:
             raise ValidationError(f"Meeting not awaiting email review. Current status: {meeting.status.value}")
+
+        selected_user_ids = review_data.recipient_user_ids
+        if review_data.decision == "approve" and selected_user_ids is None:
+            linked_participants = [
+                participant.user_id
+                for participant in meeting.attendees
+                if participant.user_id is not None
+            ]
+            # Backward-compatible legacy meetings may contain only free-text
+            # attendees. The old delivery fallback remains available for
+            # those rows; every structured meeting persists an explicit list.
+            selected_user_ids = linked_participants or None
+        if selected_user_ids is not None:
+            self._sync_email_recipients(
+                db,
+                meeting=meeting,
+                selected_by=user_id,
+                recipient_user_ids=selected_user_ids,
+            )
+            db.commit()
+            db.refresh(meeting)
 
         if review_data.decision == "approve":
             resume_payload = {"decision": "approve", "instructions": ""}
@@ -862,6 +1126,7 @@ class ProcessingService:
             else:
                 self._map_state_to_meeting(meeting, result)
                 self._sync_tasks_from_meeting(db, meeting)
+                self._finish_pending_recipient_audit(db, meeting)
                 meeting.status = MeetingStatus.REJECTED if review_data.decision == "reject" else MeetingStatus.COMPLETED
                 if meeting.status in [MeetingStatus.COMPLETED, MeetingStatus.REJECTED]:
                     self._record_terminal_processing_usage(db, meeting)

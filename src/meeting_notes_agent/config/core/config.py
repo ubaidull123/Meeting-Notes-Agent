@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     # API Server
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
+    frontend_app_url: str = Field(
+        default="http://localhost:5173",
+        alias="FRONTEND_APP_URL",
+    )
 
     # File Upload
     max_upload_size_mb: int = Field(default=100, alias="MAX_UPLOAD_SIZE_MB")

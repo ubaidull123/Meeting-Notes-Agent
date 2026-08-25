@@ -276,12 +276,27 @@ class MeetingRepository:
                         ProjectMembership.user_id == user_id,
                     ),
                 )
+                .outerjoin(
+                    Attendee,
+                    and_(
+                        Attendee.meeting_id == Meeting.id,
+                        Attendee.user_id == user_id,
+                    ),
+                )
                 .filter(
                     TeamMembership.user_id == user_id,
                     or_(
                         TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
-                        Meeting.project_id.is_(None),
-                        ProjectMembership.id.isnot(None),
+                        and_(
+                            or_(
+                                Meeting.project_id.is_(None),
+                                ProjectMembership.id.isnot(None),
+                            ),
+                            or_(
+                                Meeting.restrict_to_participants.is_(False),
+                                Attendee.id.isnot(None),
+                            ),
+                        ),
                     ),
                 )
             )
@@ -311,12 +326,27 @@ class MeetingRepository:
                     ProjectMembership.user_id == user_id,
                 ),
             )
+            .outerjoin(
+                Attendee,
+                and_(
+                    Attendee.meeting_id == Meeting.id,
+                    Attendee.user_id == user_id,
+                ),
+            )
             .filter(
                 TeamMembership.user_id == user_id,
                 or_(
                     TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
-                    Meeting.project_id.is_(None),
-                    ProjectMembership.id.isnot(None),
+                    and_(
+                        or_(
+                            Meeting.project_id.is_(None),
+                            ProjectMembership.id.isnot(None),
+                        ),
+                        or_(
+                            Meeting.restrict_to_participants.is_(False),
+                            Attendee.id.isnot(None),
+                        ),
+                    ),
                 ),
             )
         )
@@ -326,6 +356,7 @@ class MeetingRepository:
             query = query.filter(Meeting.team_id == team_id)
         if project_id:
             query = query.filter(Meeting.project_id == project_id)
+        query = query.distinct()
         total = query.count()
         meetings = query.order_by(desc(Meeting.created_at)).offset((page - 1) * page_size).limit(page_size).all()
         return meetings, total
@@ -430,7 +461,14 @@ class AttendeeRepository:
     def create_batch(self, meeting_id: UUID, attendees: List[dict]) -> List[Attendee]:
         """Create multiple attendees for a meeting."""
         attendee_objects = [
-            Attendee(meeting_id=meeting_id, name=a["name"], email=a["email"])
+            Attendee(
+                meeting_id=meeting_id,
+                user_id=a.get("user_id"),
+                name=a["name"],
+                email=a["email"],
+                title=a.get("title"),
+                department=a.get("department"),
+            )
             for a in attendees
         ]
         self.db.add_all(attendee_objects)

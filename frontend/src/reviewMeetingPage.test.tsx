@@ -25,6 +25,11 @@ vi.mock('./api/meetings', () => ({
   },
 }));
 
+vi.mock('./api/teams', () => ({
+  projectsApi: { listMembers: vi.fn().mockResolvedValue([]) },
+  teamsApi: { listMembers: vi.fn().mockResolvedValue([]) },
+}));
+
 vi.mock('./context/TeamContext', () => ({
   useTeam: () => ({
     activeTeam: { id: 'team-1', role: 'owner' },
@@ -129,6 +134,39 @@ describe('MeetingReviewPage', () => {
 
     expect(await screen.findByRole('heading', { name: /email draft review/i })).toBeInTheDocument();
     expect(screen.getByText(/approved next steps/i)).toBeInTheDocument();
+  });
+
+  it('submits only the recipients selected for this meeting', async () => {
+    const user = userEvent.setup();
+    vi.mocked(meetingsApi.getEmailDraft).mockResolvedValue({
+      meeting_id: meeting.id,
+      meeting_title: meeting.title,
+      email_draft: 'Hello team,\n\nHere are the approved next steps.',
+      delivery_error: null,
+      redacted_summary: 'Approved summary',
+      redacted_decisions: [],
+      redacted_action_items: [],
+      participants: [
+        { user_id: 1, name: 'Team Owner', email: 'owner@example.com', selected: true },
+        { user_id: 2, name: 'Ali Khan', email: 'ali@example.com', title: 'Backend Developer', selected: false },
+      ],
+    });
+    vi.mocked(meetingsApi.submitEmailReview).mockResolvedValue({
+      meeting_id: meeting.id,
+      sent: true,
+      response: { status: 'sent' },
+      message: 'Email sent.',
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /review email/i }));
+    await user.click(await screen.findByRole('checkbox', { name: /ali khan/i }));
+    await user.click(screen.getByRole('button', { name: /send email/i }));
+
+    await waitFor(() => expect(meetingsApi.submitEmailReview).toHaveBeenCalledWith(
+      meeting.id,
+      expect.objectContaining({ recipient_user_ids: [1, 2] }),
+    ));
   });
 
   it('does not expose meeting-management controls to a normal member', async () => {

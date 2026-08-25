@@ -42,5 +42,8 @@ class ProjectMemberResponse(BaseModel):
     user_id: int
     email: str
     full_name: str
+    title: str | None = None
+    department: str | None = None
+    status: str = "active"
     is_active: bool
     created_at: datetime

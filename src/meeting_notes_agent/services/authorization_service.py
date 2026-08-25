@@ -12,6 +12,7 @@ from meeting_notes_agent.config.core.exceptions import (
     ValidationError,
 )
 from meeting_notes_agent.database.models import (
+    Attendee,
     Meeting,
     Project,
     ProjectMembership,
@@ -101,17 +102,30 @@ class AuthorizationService:
         if team_membership is None:
             raise NotFoundError("Meeting not found")
         if team_membership.role in TEAM_MANAGEMENT_ROLES or meeting.project_id is None:
-            return meeting
-        project_membership = (
-            self.db.query(ProjectMembership)
-            .filter(
-                ProjectMembership.project_id == meeting.project_id,
-                ProjectMembership.user_id == user_id,
+            if team_membership.role in TEAM_MANAGEMENT_ROLES:
+                return meeting
+        if meeting.project_id is not None:
+            project_membership = (
+                self.db.query(ProjectMembership)
+                .filter(
+                    ProjectMembership.project_id == meeting.project_id,
+                    ProjectMembership.user_id == user_id,
+                )
+                .first()
             )
-            .first()
-        )
-        if project_membership is None:
-            raise NotFoundError("Meeting not found")
+            if project_membership is None:
+                raise NotFoundError("Meeting not found")
+        if meeting.restrict_to_participants:
+            participant = (
+                self.db.query(Attendee)
+                .filter(
+                    Attendee.meeting_id == meeting.id,
+                    Attendee.user_id == user_id,
+                )
+                .first()
+            )
+            if participant is None:
+                raise NotFoundError("Meeting not found")
         return meeting
 
     def require_meeting_admin(self, meeting_id: UUID, user_id: int) -> Meeting:

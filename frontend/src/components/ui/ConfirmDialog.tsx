@@ -39,15 +39,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-slate-950/50 backdrop-blur-[2px] transition-opacity"
         onClick={() => !isLoading && onClose()}
       />
 
       {/* Modal Card */}
-      <div className="relative w-full max-w-md rounded-xl border bg-card p-6 shadow-xl z-10 animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 sm:p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div
@@ -60,13 +60,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             >
               <AlertCircle className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-semibold text-foreground">{title}</h3>
+            <h3 id="confirm-dialog-title" className="text-base font-semibold text-foreground">{title}</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
             className="text-muted-foreground hover:text-foreground p-1 rounded-md transition-colors"
+            aria-label="Close confirmation"
           >
             <X className="w-4 h-4" />
           </button>
@@ -74,7 +75,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
         <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{description}</p>
 
-        <div className="mt-6 flex items-center justify-end gap-2.5">
+        <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-end">
           <button
             type="button"
             onClick={onClose}

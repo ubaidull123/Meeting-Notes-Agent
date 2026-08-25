@@ -9,7 +9,7 @@ from meeting_notes_agent.auth.security import (
     decode_refresh_token,
 )
 from meeting_notes_agent.database import UserRepository, UserQuotaRepository, UserCreditsRepository, UserUsageRepository, get_db
-from meeting_notes_agent.database.models import Team, TeamMembership, TeamRole, UserRole
+from meeting_notes_agent.database.models import Team, TeamInvitation, TeamMembership, TeamRole, UserRole
 from meeting_notes_agent.config.core.exceptions import (
     AuthenticationError,
     ConflictError,
@@ -31,6 +31,42 @@ class AuthService:
         if self.db:
             return self.db
         return next(get_db())
+
+    @staticmethod
+    def _accept_pending_invitations(db, user) -> int:
+        invitations = (
+            db.query(TeamInvitation)
+            .filter(
+                TeamInvitation.email == user.email.lower(),
+                TeamInvitation.status == "pending",
+            )
+            .all()
+        )
+        accepted = 0
+        for invitation in invitations:
+            membership = (
+                db.query(TeamMembership)
+                .filter(
+                    TeamMembership.team_id == invitation.team_id,
+                    TeamMembership.user_id == user.id,
+                )
+                .first()
+            )
+            if membership is None:
+                db.add(
+                    TeamMembership(
+                        team_id=invitation.team_id,
+                        user_id=user.id,
+                        role=invitation.role,
+                        title=invitation.title,
+                        department=invitation.department,
+                    )
+                )
+            invitation.status = "accepted"
+            invitation.accepted_by = user.id
+            invitation.accepted_at = datetime.now(timezone.utc)
+            accepted += 1
+        return accepted
 
     def register(self, data: UserRegister) -> UserProfileResponse:
         """Register a new user."""
@@ -54,22 +90,26 @@ class AuthService:
             role=UserRole.USER,
         )
 
-        # Preserve the former independent-user experience as a transactional
-        # default workspace while enabling future multi-team membership.
-        default_team = Team(
-            name=f"{data.full_name.strip()[:248]}'s Team",
-            description="Default workspace",
-            created_by=user.id,
-        )
-        db.add(default_team)
-        db.flush()
-        db.add(
-            TeamMembership(
-                team_id=default_team.id,
-                user_id=user.id,
-                role=TeamRole.OWNER,
+        accepted_invitations = self._accept_pending_invitations(db, user)
+        if accepted_invitations == 0:
+            # Preserve the former independent-user experience for people who
+            # register without an invitation. Invited collaborators land in
+            # the workspace they were invited to instead of receiving a
+            # distracting extra personal workspace.
+            default_team = Team(
+                name=f"{data.full_name.strip()[:248]}'s Team",
+                description="Default workspace",
+                created_by=user.id,
             )
-        )
+            db.add(default_team)
+            db.flush()
+            db.add(
+                TeamMembership(
+                    team_id=default_team.id,
+                    user_id=user.id,
+                    role=TeamRole.OWNER,
+                )
+            )
 
         # Create default quota and credits with initial balance
         quota_repo.get_or_create(user.id)
@@ -96,6 +136,9 @@ class AuthService:
 
         if not user.is_active:
             raise AuthenticationError("Account is disabled")
+
+        if self._accept_pending_invitations(db, user):
+            db.commit()
 
         access_token, refresh_token = create_token_pair(
             user_id=user.id,

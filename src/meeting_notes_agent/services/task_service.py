@@ -28,7 +28,7 @@ class TaskService:
         task_repo = TaskRepository(db)
         authorization = AuthorizationService(db)
         meeting = authorization.require_meeting_admin(data.meeting_id, user_id)
-        authorization.validate_task_assignee(
+        assigned_user = authorization.validate_task_assignee(
             team_id=meeting.team_id,
             project_id=meeting.project_id,
             assigned_user_id=data.assigned_user_id,
@@ -43,7 +43,7 @@ class TaskService:
             description=data.description,
             status=data.status,
             priority=data.priority,
-            assignee=data.assignee,
+            assignee=assigned_user.full_name if assigned_user else data.assignee,
             assigned_user_id=data.assigned_user_id,
             due_date=data.due_date,
             labels=data.labels,
@@ -105,11 +105,12 @@ class TaskService:
                 raise AuthorizationError("Members may update only task status")
             task = authorization.require_task_status_access(task_id, user_id)
         if "assigned_user_id" in update_data:
-            authorization.validate_task_assignee(
+            assigned_user = authorization.validate_task_assignee(
                 team_id=task.team_id,
                 project_id=task.project_id,
                 assigned_user_id=update_data["assigned_user_id"],
             )
+            update_data["assignee"] = assigned_user.full_name if assigned_user else None
         task_repo.update(task, **update_data)
         db.commit()
         db.refresh(task)

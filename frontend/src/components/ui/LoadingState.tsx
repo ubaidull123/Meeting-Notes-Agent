@@ -16,9 +16,11 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ size = 'md', cla
   };
 
   return (
-    <div className={cn('flex flex-col items-center justify-center gap-2', className)}>
-      <Loader2 className={cn('animate-spin text-teal-600 dark:text-teal-400', sizeClasses[size])} />
-      {label && <span className="text-xs text-muted-foreground">{label}</span>}
+    <div className={cn('flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-card/60', className)} role="status" aria-live="polite">
+      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+        <Loader2 className={cn('animate-spin text-primary', sizeClasses[size])} />
+      </span>
+      {label && <span className="text-sm font-medium text-muted-foreground">{label}</span>}
     </div>
   );
 };

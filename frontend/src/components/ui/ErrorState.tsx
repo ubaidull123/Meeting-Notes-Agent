@@ -18,20 +18,20 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center p-8 text-center rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20',
+        'flex min-h-48 flex-col items-center justify-center rounded-xl border border-rose-200 bg-rose-50/60 p-6 text-center dark:border-rose-900/50 dark:bg-rose-950/20',
         className
       )}
     >
-      <div className="p-3 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 mb-3">
-        <AlertTriangle className="w-6 h-6" />
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-400">
+        <AlertTriangle className="h-5 w-5" />
       </div>
-      <h4 className="text-sm font-semibold text-rose-900 dark:text-rose-200">{title}</h4>
-      <p className="mt-1 text-xs text-rose-700 dark:text-rose-400 max-w-md">{message}</p>
+      <h4 className="text-sm font-semibold text-rose-950 dark:text-rose-200">{title}</h4>
+      <p className="mt-1.5 max-w-md text-sm leading-6 text-rose-700 dark:text-rose-400">{message}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-700 dark:text-rose-300 bg-white dark:bg-rose-900/40 border border-rose-300 dark:border-rose-700 hover:bg-rose-100/50 rounded-md transition-colors"
+          className="mt-4 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100/50 dark:border-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Try Again</span>

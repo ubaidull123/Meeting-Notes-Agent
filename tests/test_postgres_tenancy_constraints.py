@@ -7,7 +7,9 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from meeting_notes_agent.database.models import (
+    Attendee,
     Meeting,
+    MeetingEmailRecipient,
     MeetingStatus,
     Project,
     ProjectMembership,
@@ -15,6 +17,7 @@ from meeting_notes_agent.database.models import (
     TaskPriority,
     TaskStatus,
     Team,
+    TeamInvitation,
     TeamMembership,
     TeamRole,
 )
@@ -143,3 +146,76 @@ def test_postgres_transaction_rollback_leaves_no_partial_team(db_session, test_u
         .count()
         == 0
     )
+
+
+def test_postgres_collaboration_uniqueness_constraints(db_session, test_user):
+    team_id = test_user.team_memberships[0].team_id
+    invitation_email = f"postgres-invite-{uuid4().hex[:8]}@example.com"
+    db_session.add(
+        TeamInvitation(
+            team_id=team_id,
+            email=invitation_email,
+            full_name="Postgres Invite",
+            role=TeamRole.MEMBER,
+            status="pending",
+            invited_by=test_user.id,
+        )
+    )
+    db_session.commit()
+    db_session.add(
+        TeamInvitation(
+            team_id=team_id,
+            email=invitation_email,
+            full_name="Duplicate Invite",
+            role=TeamRole.MEMBER,
+            status="pending",
+            invited_by=test_user.id,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    meeting = Meeting(
+        user_id=test_user.id,
+        team_id=team_id,
+        created_by=test_user.id,
+        title="Postgres participant constraints",
+        meeting_date=date.today(),
+        transcript_text="Transcript",
+        restrict_to_participants=True,
+    )
+    db_session.add(meeting)
+    db_session.flush()
+    participant = Attendee(
+        meeting_id=meeting.id,
+        user_id=test_user.id,
+        name=test_user.full_name,
+        email=test_user.email,
+    )
+    db_session.add(participant)
+    db_session.flush()
+    db_session.add(
+        MeetingEmailRecipient(
+            meeting_id=meeting.id,
+            attendee_id=participant.id,
+            user_id=test_user.id,
+            email=test_user.email,
+            status="pending",
+            selected_by=test_user.id,
+        )
+    )
+    db_session.commit()
+    db_session.add(
+        MeetingEmailRecipient(
+            meeting_id=meeting.id,
+            attendee_id=participant.id,
+            user_id=test_user.id,
+            email=test_user.email,
+            status="pending",
+            selected_by=test_user.id,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

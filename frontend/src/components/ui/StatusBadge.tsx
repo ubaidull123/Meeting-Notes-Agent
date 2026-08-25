@@ -13,6 +13,7 @@ import {
   UserCheck,
   XCircle,
   HelpCircle,
+  CircleDashed,
 } from 'lucide-react';
 
 interface StatusBadgeProps {
@@ -107,8 +108,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className, siz
       case 'in_progress':
         return {
           label: 'In Progress',
-          icon: Loader2,
-          animate: true,
+          icon: CircleDashed,
           bg: 'bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border-sky-200 dark:border-sky-800',
         };
       case 'in_review':
@@ -133,8 +133,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className, siz
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 font-medium border rounded-full',
-        size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border font-semibold',
+        size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs',
         config.bg,
         className
       )}

@@ -18,6 +18,9 @@ export interface Attendee {
   meeting_id?: string;
   name: string;
   email: string;
+  user_id?: number | null;
+  title?: string | null;
+  department?: string | null;
   created_at?: string;
 }
 
@@ -64,6 +67,7 @@ export interface Meeting {
   email_draft?: string | null;
   email_sent: boolean;
   email_response?: Record<string, unknown> | null;
+  restrict_to_participants?: boolean;
   tokens_used: number;
   thread_id?: string | null;
   error_code?: string | null;
@@ -81,7 +85,8 @@ export interface MeetingCreateRequest {
   project_id?: string | null;
   agenda?: string[];
   notes?: string | null;
-  attendees: Array<{ name: string; email: string }>;
+  attendees?: Array<{ name: string; email: string }>;
+  participant_user_ids?: number[];
   transcript_text?: string | null;
   audio_file_path?: string | null;
   transcript_file_path?: string | null;
@@ -96,6 +101,7 @@ export interface MeetingUpdateRequest {
   agenda?: string[];
   notes?: string | null;
   attendees?: Array<{ name: string; email: string }>;
+  participant_user_ids?: number[];
 }
 
 export interface MeetingStatusResponse {
@@ -151,12 +157,24 @@ export interface EmailDraftResponse {
   redacted_summary: string;
   redacted_decisions: string[];
   redacted_action_items: string[];
+  participants?: EmailParticipant[];
   delivery_error?: string | null;
 }
 
 export interface EmailReviewRequest {
   decision: 'approve' | 'reject' | 'revise';
   instructions?: string | null;
+  recipient_user_ids?: number[];
+}
+
+export interface EmailParticipant {
+  user_id: number;
+  name: string;
+  email: string;
+  title?: string | null;
+  department?: string | null;
+  selected: boolean;
+  delivery_status?: 'pending' | 'sent' | 'failed' | null;
 }
 
 export interface EmailSendResponse {

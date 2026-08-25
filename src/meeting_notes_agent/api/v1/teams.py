@@ -103,3 +103,16 @@ async def remove_team_member(
     db=Depends(get_db),
 ):
     TeamService(db).remove_member(team_id, user_id, current_user.id)
+
+
+@router.delete(
+    "/{team_id}/invitations/{invitation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_team_invitation(
+    team_id: UUID,
+    invitation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db=Depends(get_db),
+):
+    TeamService(db).revoke_invitation(team_id, invitation_id, current_user.id)

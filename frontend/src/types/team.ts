@@ -1,5 +1,15 @@
 export type TeamRole = 'owner' | 'admin' | 'member';
 
+export interface MemberOption {
+  id: string;
+  user_id?: number | null;
+  email: string;
+  full_name: string;
+  title?: string | null;
+  department?: string | null;
+  status: 'active' | 'pending' | 'accepted' | 'revoked';
+}
+
 export interface Team {
   id: string;
   name: string;
@@ -23,13 +33,25 @@ export interface TeamUpdateRequest {
 export interface TeamMember {
   id: string;
   team_id: string;
-  user_id: number;
+  user_id?: number | null;
   role: TeamRole;
   email: string;
   full_name: string;
+  title?: string | null;
+  department?: string | null;
+  status: 'active' | 'pending' | 'accepted' | 'revoked';
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  accepted_at?: string | null;
+}
+
+export interface TeamMemberAddRequest {
+  full_name: string;
+  email: string;
+  title?: string | null;
+  department?: string | null;
+  role?: TeamRole;
 }
 
 export interface Project {
@@ -62,6 +84,9 @@ export interface ProjectMember {
   user_id: number;
   email: string;
   full_name: string;
+  title?: string | null;
+  department?: string | null;
+  status: 'active';
   is_active: boolean;
   created_at: string;
 }

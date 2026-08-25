@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -11,6 +11,7 @@ from meeting_notes_agent.auth.security import create_access_token, hash_password
 from meeting_notes_agent.database.models import (
     Attendee,
     Meeting,
+    MeetingEmailRecipient,
     MeetingStatus,
     PlatformRole,
     Project,
@@ -20,6 +21,7 @@ from meeting_notes_agent.database.models import (
     TaskStatus,
     Team,
     TeamMembership,
+    TeamInvitation,
     TeamRole,
     User,
     UserRole,
@@ -488,3 +490,218 @@ def test_owner_safety_and_team_member_cleanup(client, tenant_scenario, db_sessio
     db_session.expire_all()
     assert db_session.query(ProjectMembership).filter_by(user_id=removed_id).count() == 0
     assert db_session.query(Task).filter_by(id=s.tasks.assigned.id).one().assigned_user_id == removed_id
+
+
+def test_email_member_add_and_pending_invitation_reconciliation(
+    client, tenant_scenario, db_session
+):
+    s = tenant_scenario
+    existing = client.post(
+        f"/api/v1/teams/{s.teams.a.id}/members",
+        headers=s.headers["a_owner"],
+        json={
+            "full_name": "Candidate Person",
+            "email": s.users.candidate.email,
+            "title": "Backend Developer",
+            "department": "Engineering",
+            "role": "member",
+        },
+    )
+    assert existing.status_code == 201
+    assert existing.json()["user_id"] == s.users.candidate.id
+    assert existing.json()["status"] == "active"
+    assert existing.json()["title"] == "Backend Developer"
+
+    duplicate = client.post(
+        f"/api/v1/teams/{s.teams.a.id}/members",
+        headers=s.headers["a_owner"],
+        json={"full_name": "Candidate Person", "email": s.users.candidate.email},
+    )
+    assert duplicate.status_code == 409
+
+    invited_email = f"invited-{uuid4().hex[:10]}@example.com"
+    invited = client.post(
+        f"/api/v1/teams/{s.teams.a.id}/members",
+        headers=s.headers["a_owner"],
+        json={
+            "full_name": "Invited Engineer",
+            "email": invited_email,
+            "title": "AI Engineer",
+        },
+    )
+    assert invited.status_code == 201
+    assert invited.json()["status"] == "pending"
+    assert invited.json()["user_id"] is None
+    assert client.post(
+        f"/api/v1/teams/{s.teams.a.id}/members",
+        headers=s.headers["a_member"],
+        json={"full_name": "Forbidden", "email": f"forbidden-{uuid4().hex}@example.com"},
+    ).status_code == 403
+
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={
+            "full_name": "Invited Engineer",
+            "email": invited_email,
+            "password": "InvitationPass123!",
+        },
+    )
+    assert registered.status_code == 201
+    invited_user_id = registered.json()["id"]
+    membership = db_session.query(TeamMembership).filter_by(
+        team_id=s.teams.a.id, user_id=invited_user_id
+    ).one()
+    assert membership.title == "AI Engineer"
+    invitation = db_session.query(TeamInvitation).filter_by(
+        team_id=s.teams.a.id, email=invited_email
+    ).one()
+    assert invitation.status == "accepted"
+    assert invitation.accepted_by == invited_user_id
+
+
+def test_structured_meeting_participants_restrict_project_access(
+    client, tenant_scenario, db_session
+):
+    s = tenant_scenario
+    db_session.add(
+        ProjectMembership(project_id=s.projects.a1.id, user_id=s.users.a_unassigned.id)
+    )
+    db_session.commit()
+
+    created = client.post(
+        "/api/v1/meetings",
+        headers=s.headers["a_owner"],
+        json={
+            "title": "Participant restricted review",
+            "meeting_date": date.today().isoformat(),
+            "team_id": str(s.teams.a.id),
+            "project_id": str(s.projects.a1.id),
+            "participant_user_ids": [s.users.a_member.id],
+            "transcript_text": "A participant-restricted transcript.",
+        },
+    )
+    assert created.status_code == 201
+    meeting = created.json()
+    assert meeting["restrict_to_participants"] is True
+    assert meeting["attendees"][0]["user_id"] == s.users.a_member.id
+    assert client.get(
+        f"/api/v1/meetings/{meeting['id']}", headers=s.headers["a_member"]
+    ).status_code == 200
+    assert client.get(
+        f"/api/v1/meetings/{meeting['id']}", headers=s.headers["a_unassigned"]
+    ).status_code == 404
+    assert client.patch(
+        f"/api/v1/meetings/{meeting['id']}",
+        headers=s.headers["a_member"],
+        json={"participant_user_ids": [s.users.a_member.id]},
+    ).status_code == 403
+
+    invalid = client.post(
+        "/api/v1/meetings",
+        headers=s.headers["a_owner"],
+        json={
+            "title": "Invalid participant",
+            "meeting_date": date.today().isoformat(),
+            "team_id": str(s.teams.a.id),
+            "project_id": str(s.projects.a1.id),
+            "participant_user_ids": [s.users.b_member.id],
+            "transcript_text": "Invalid",
+        },
+    )
+    assert invalid.status_code == 400
+
+
+def test_email_recipients_are_a_subset_of_meeting_participants(
+    client, tenant_scenario, db_session, monkeypatch
+):
+    s = tenant_scenario
+    db_session.add_all(
+        [
+            TeamMembership(
+                team_id=s.teams.a.id,
+                user_id=s.users.candidate.id,
+                role=TeamRole.MEMBER,
+            ),
+            ProjectMembership(
+                project_id=s.projects.a1.id,
+                user_id=s.users.candidate.id,
+            ),
+            ProjectMembership(
+                project_id=s.projects.a1.id,
+                user_id=s.users.a_unassigned.id,
+            ),
+        ]
+    )
+    db_session.commit()
+    created = client.post(
+        "/api/v1/meetings",
+        headers=s.headers["a_owner"],
+        json={
+            "title": "Recipient selection review",
+            "meeting_date": date.today().isoformat(),
+            "team_id": str(s.teams.a.id),
+            "project_id": str(s.projects.a1.id),
+            "participant_user_ids": [s.users.a_member.id, s.users.candidate.id],
+            "transcript_text": "Recipient selection transcript.",
+        },
+    )
+    assert created.status_code == 201
+    meeting_id = created.json()["id"]
+    meeting = db_session.query(Meeting).filter_by(id=UUID(meeting_id)).one()
+    meeting.status = MeetingStatus.AWAITING_EMAIL_REVIEW
+    meeting.thread_id = f"email-{uuid4()}"
+    meeting.email_draft = "Reviewed follow-up"
+    meeting.redacted_summary = "Reviewed summary"
+    db_session.commit()
+
+    class EmailGraph:
+        def get_state(self, config):
+            return SimpleNamespace(values={}, next=("EmailReview",))
+
+        def invoke(self, payload, config):
+            return {
+                "email_sent": True,
+                "email_response": {"id": "selected-recipient-delivery"},
+                "email_draft": "Reviewed follow-up",
+                "redacted_summary": "Reviewed summary",
+            }
+
+    monkeypatch.setattr(
+        ProcessingService,
+        "graph",
+        property(lambda _service: EmailGraph()),
+    )
+
+    draft = client.get(
+        f"/api/v1/meetings/{meeting_id}/email-review",
+        headers=s.headers["a_owner"],
+    )
+    assert draft.status_code == 200
+    assert {item["user_id"] for item in draft.json()["participants"]} == {
+        s.users.a_member.id,
+        s.users.candidate.id,
+    }
+    assert client.post(
+        f"/api/v1/meetings/{meeting_id}/email-review",
+        headers=s.headers["a_owner"],
+        json={
+            "decision": "approve",
+            "recipient_user_ids": [s.users.a_unassigned.id],
+        },
+    ).status_code == 400
+
+    sent = client.post(
+        f"/api/v1/meetings/{meeting_id}/email-review",
+        headers=s.headers["a_owner"],
+        json={
+            "decision": "approve",
+            "recipient_user_ids": [s.users.a_member.id],
+        },
+    )
+    assert sent.status_code == 200
+    recipients = db_session.query(MeetingEmailRecipient).filter_by(
+        meeting_id=meeting.id
+    ).all()
+    assert [(recipient.user_id, recipient.status) for recipient in recipients] == [
+        (s.users.a_member.id, "sent")
+    ]
