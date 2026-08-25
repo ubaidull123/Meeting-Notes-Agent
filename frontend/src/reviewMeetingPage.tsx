@@ -17,7 +17,6 @@ import { EmailReviewModal } from './components/meetings/EmailReviewModal';
 import { MeetingEditDialog } from './components/meetings/MeetingEditDialog';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { EmailReviewRequest, Meeting, MeetingStatus, MeetingUpdateRequest, ReviewRequest } from './types/meeting';
-import { MeetingOverridePanel } from './components/settings/MeetingOverridePanel';
 import { TaskTable } from './components/tasks/TaskTable';
 import { TaskStatus } from './types/task';
 import { useTeam } from './context/TeamContext';
@@ -97,7 +96,6 @@ export function MeetingReviewPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editFocus, setEditFocus] = useState<'title' | 'notes'>('title');
   const [isActionsOpen, setIsActionsOpen] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   const meetingKey = useMemo(() => ['meeting', activeTeam?.id, meetingId] as const, [activeTeam?.id, meetingId]);
   const meeting = useQuery({ queryKey: meetingKey, queryFn: () => meetingsApi.getMeeting(meetingId) });
@@ -231,8 +229,6 @@ export function MeetingReviewPage() {
       </div>
       {(canReview || canReviewEmail) && <section className="rounded-xl border border-purple-200 bg-purple-50 p-4 text-sm text-purple-950 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-100"><strong>{canReviewEmail ? 'Email approval required.' : 'Review required.'}</strong> {canReviewEmail ? 'Review the attendee email before it is sent.' : 'Check the generated summary and action items before the workflow continues.'}</section>}
       {canManage && <ProcessingTimeline status={currentStatus} currentStage={status.data?.current_stage} progressPercentage={status.data?.progress_percentage} errorMessage={status.data?.error ?? data.error_message} errorCode={data.error_code} sourceType={sourceType} hasTranscription={Boolean(data.raw_transcription || data.cleaned_transcription || sourceType === 'supplied_transcript')} />}
-      {canManage && <section className={card}><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">AI & transcription configuration</h2><p className="mt-1 text-sm text-muted-foreground">This meeting uses workspace defaults unless a meeting override is saved.</p></div>{canStart && <button className={secondaryButton} onClick={() => setIsConfigOpen(value => !value)}>{isConfigOpen ? 'Hide configuration' : 'Configure meeting'}</button>}</div></section>}
-      {canStart && isConfigOpen && <MeetingOverridePanel meetingId={meetingId} />}
       <section className="rounded-xl border border-border bg-card px-5 py-4 text-sm text-muted-foreground"><span className="font-medium text-foreground">Recent activity:</span> Updated {new Date(data.updated_at).toLocaleString()} &middot; {data.tokens_used.toLocaleString()} AI tokens used</section>
     </div>}
 

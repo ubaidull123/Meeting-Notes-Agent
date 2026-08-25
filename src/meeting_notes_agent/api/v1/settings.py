@@ -228,9 +228,11 @@ async def list_credentials(current_user_id: Annotated[int, Depends(get_current_c
 
 @router.post("/credentials", response_model=CredentialPublic, status_code=status.HTTP_201_CREATED)
 async def save_credential(data: CredentialSaveRequest, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
-    credential = AISettingsService(db).save_credential(current_user_id, data.provider, data.api_key, data.config)
+    service = AISettingsService(db)
+    credential = service.save_credential(current_user_id, data.provider, data.api_key, data.config)
+    service.apply_credential_as_default(current_user_id, data.provider)
     db.commit()
-    return _credential_public(credential, AISettingsService(db))
+    return _credential_public(credential, service)
 
 
 @router.delete("/credentials/{provider}", status_code=status.HTTP_204_NO_CONTENT)

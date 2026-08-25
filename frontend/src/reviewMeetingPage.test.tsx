@@ -179,6 +179,7 @@ describe('MeetingReviewPage', () => {
     expect(screen.queryByRole('button', { name: /stop processing/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /transcript/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /activity/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI & transcription configuration/i)).not.toBeInTheDocument();
   });
 
   it('confirms and submits a stop-processing request', async () => {
