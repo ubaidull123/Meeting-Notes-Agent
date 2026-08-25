@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Github } from 'lucide-react';
+import { Github } from 'lucide-react';
+import { BrandMark } from '../ui/BrandMark';
 
 const GITHUB_REPO_URL = 'https://github.com/ubaidull123/Meeting-Notes-Agent';
 
@@ -15,9 +16,7 @@ export const LandingFooter: React.FC = () => {
               to="/"
               className="inline-flex items-center gap-2 font-semibold text-foreground hover:opacity-90 transition-opacity"
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-600 text-white shadow-xs">
-                <Sparkles className="h-4 w-4" />
-              </div>
+              <BrandMark size="sm" />
               <span className="text-base font-bold text-foreground">Meeting Notes Agent</span>
             </Link>
             <p className="text-xs text-muted-foreground">

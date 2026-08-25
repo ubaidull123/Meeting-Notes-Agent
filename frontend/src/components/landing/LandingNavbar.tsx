@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Menu, X, Github, ArrowRight, Sun, Moon } from 'lucide-react';
+import { Menu, X, Github, ArrowRight, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { BrandMark } from '../ui/BrandMark';
 
 const GITHUB_REPO_URL = 'https://github.com/ubaidull123/Meeting-Notes-Agent';
 
@@ -31,9 +32,7 @@ export const LandingNavbar: React.FC = () => {
           className="flex items-center gap-2.5 font-semibold text-foreground hover:opacity-90 transition-opacity focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg p-1"
           aria-label="Meeting Notes Agent Home"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-white shadow-xs">
-            <Sparkles className="h-5 w-5" />
-          </div>
+          <BrandMark size="lg" />
           <span className="text-lg font-bold tracking-tight text-foreground">
             Meeting Notes Agent
           </span>

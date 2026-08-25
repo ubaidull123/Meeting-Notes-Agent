@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Eye, EyeOff, Loader2, Plus, FileText, CreditCard, ListTodo, AlertTriangle, Upload, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Plus, FileText, CreditCard, ListTodo, AlertTriangle, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from './context/AuthContext';
 import { meetingsApi } from './api/meetings';
@@ -14,13 +14,14 @@ import { LoadingState } from './components/ui/LoadingState';
 import { ErrorState } from './components/ui/ErrorState';
 import { StatCard } from './components/ui/StatCard';
 import { AttendeeItem, AttendeeEditor } from './components/ui/AttendeeEditor';
+import { BrandMark } from './components/ui/BrandMark';
 import { MeetingStatus } from './types';
 
 const field = 'w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20';
 const button = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60';
 const card = 'rounded-xl border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]';
 
-function AuthFrame({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) { return <main className="flex min-h-screen items-center justify-center bg-background p-4"><section className="w-full max-w-md rounded-2xl border border-border/80 bg-card p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-8"><Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-950 text-white dark:bg-white dark:text-slate-950"><Sparkles className="h-4 w-4" /></span>Meeting Notes</Link><div className="mt-7"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</p></div>{children}</section></main>; }
+function AuthFrame({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) { return <main className="flex min-h-screen items-center justify-center bg-background p-4"><section className="w-full max-w-md rounded-2xl border border-border/80 bg-card p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-8"><Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground"><BrandMark />Meeting Notes</Link><div className="mt-7"><h1 className="text-2xl font-semibold tracking-tight">{title}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</p></div>{children}</section></main>; }
 
 export function LoginPage() { const { isAuthenticated, isAdmin, login } = useAuth(); const nav = useNavigate(); const [email,setEmail]=useState(''); const [password,setPassword]=useState(''); const [show,setShow]=useState(false); const [error,setError]=useState(''); const mutation=useMutation({mutationFn:()=>login({email,password}),onSuccess:profile=>nav(profile.platform_role==='platform_admin'?'/admin':'/dashboard'),onError:e=>setError(formatErrorMessage(e,'Incorrect email or password.'))}); if(isAuthenticated) return <Navigate to={isAdmin?'/admin':'/dashboard'} replace/>; return <AuthFrame title="Welcome back" subtitle="Sign in to continue to your team workspace."><form className="mt-6 space-y-4" onSubmit={e=>{e.preventDefault();setError('');mutation.mutate();}}><label className="block text-sm font-medium">Email address<input className={'mt-1.5 '+field} type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" placeholder="you@company.com"/></label><label className="block text-sm font-medium">Password<div className="relative mt-1.5"><input className={field+' pr-10'} type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password"/><button type="button" onClick={()=>setShow(!show)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Toggle password visibility">{show?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></label>{error&&<p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">{error}</p>}<button className={button+' w-full'} disabled={mutation.isPending}>{mutation.isPending&&<Loader2 className="animate-spin" size={16}/>}Sign in</button></form><p className="mt-6 text-center text-sm text-muted-foreground">New here? <Link className="font-semibold text-primary hover:underline" to="/register">Create an account</Link></p></AuthFrame>; }
 

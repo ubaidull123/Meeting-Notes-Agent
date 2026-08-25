@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTeam } from '../../context/TeamContext';
 import { cn } from '../../utils/cn';
+import { BrandMark } from '../ui/BrandMark';
 import {
   LayoutDashboard,
   Calendar,
@@ -12,7 +13,6 @@ import {
   Layers,
   FolderKanban,
   Settings,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   Building2,
@@ -72,9 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Brand Header */}
       <div className="flex h-16 items-center gap-3 border-b border-border/70 px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950">
-          <Sparkles className="w-4 h-4" />
-        </div>
+        <BrandMark />
         {!isCollapsed && (
           <div className="flex flex-col overflow-hidden">
             <span className="truncate text-sm font-semibold tracking-tight text-foreground">
