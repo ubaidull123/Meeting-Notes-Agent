@@ -21,6 +21,7 @@ from meeting_notes_agent.database.models import (
     TeamMembership,
     TeamRole,
 )
+from meeting_notes_agent.database.repositories import MeetingRepository
 
 
 pytestmark = pytest.mark.usefixtures("test_engine")
@@ -40,6 +41,40 @@ def test_postgres_uses_uuid_and_timezone_aware_timestamps(db_session, test_user)
     assert isinstance(membership.id, UUID)
     assert team.created_at.tzinfo is not None
     assert membership.created_at.tzinfo is not None
+
+
+def test_postgres_meeting_list_does_not_compare_json_columns(db_session, test_user):
+    team_id = test_user.team_memberships[0].team_id
+    meeting = Meeting(
+        user_id=test_user.id,
+        team_id=team_id,
+        created_by=test_user.id,
+        title="PostgreSQL meeting list",
+        meeting_date=date.today(),
+        transcript_text="Transcript",
+        agenda=["Review JSON-backed fields"],
+        decisions=["Use EXISTS for participant access"],
+        restrict_to_participants=True,
+    )
+    db_session.add(meeting)
+    db_session.flush()
+    db_session.add(
+        Attendee(
+            meeting_id=meeting.id,
+            user_id=test_user.id,
+            name=test_user.full_name,
+            email=test_user.email,
+        )
+    )
+    db_session.commit()
+
+    meetings, total = MeetingRepository(db_session).get_user_meetings(
+        test_user.id,
+        team_id=team_id,
+    )
+
+    assert total == 1
+    assert [item.id for item in meetings] == [meeting.id]
 
 
 def test_postgres_rejects_duplicate_team_and_project_memberships(

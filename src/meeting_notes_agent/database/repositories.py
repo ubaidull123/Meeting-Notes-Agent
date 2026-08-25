@@ -4,7 +4,7 @@ from typing import Optional, List, Tuple
 import uuid
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, desc, and_, or_
+from sqlalchemy import func, desc, and_, or_, exists
 
 from meeting_notes_agent.database.models import (
     User,
@@ -276,13 +276,6 @@ class MeetingRepository:
                         ProjectMembership.user_id == user_id,
                     ),
                 )
-                .outerjoin(
-                    Attendee,
-                    and_(
-                        Attendee.meeting_id == Meeting.id,
-                        Attendee.user_id == user_id,
-                    ),
-                )
                 .filter(
                     TeamMembership.user_id == user_id,
                     or_(
@@ -294,7 +287,12 @@ class MeetingRepository:
                             ),
                             or_(
                                 Meeting.restrict_to_participants.is_(False),
-                                Attendee.id.isnot(None),
+                                exists().where(
+                                    and_(
+                                        Attendee.meeting_id == Meeting.id,
+                                        Attendee.user_id == user_id,
+                                    )
+                                ),
                             ),
                         ),
                     ),
@@ -326,13 +324,6 @@ class MeetingRepository:
                     ProjectMembership.user_id == user_id,
                 ),
             )
-            .outerjoin(
-                Attendee,
-                and_(
-                    Attendee.meeting_id == Meeting.id,
-                    Attendee.user_id == user_id,
-                ),
-            )
             .filter(
                 TeamMembership.user_id == user_id,
                 or_(
@@ -344,7 +335,12 @@ class MeetingRepository:
                         ),
                         or_(
                             Meeting.restrict_to_participants.is_(False),
-                            Attendee.id.isnot(None),
+                            exists().where(
+                                and_(
+                                    Attendee.meeting_id == Meeting.id,
+                                    Attendee.user_id == user_id,
+                                )
+                            ),
                         ),
                     ),
                 ),
@@ -356,7 +352,6 @@ class MeetingRepository:
             query = query.filter(Meeting.team_id == team_id)
         if project_id:
             query = query.filter(Meeting.project_id == project_id)
-        query = query.distinct()
         total = query.count()
         meetings = query.order_by(desc(Meeting.created_at)).offset((page - 1) * page_size).limit(page_size).all()
         return meetings, total
