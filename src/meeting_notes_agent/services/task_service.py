@@ -4,9 +4,10 @@ from typing import Optional, List, Tuple
 from uuid import UUID
 
 from meeting_notes_agent.database import TaskRepository, get_db
-from meeting_notes_agent.database.models import TaskStatus, TaskPriority
-from meeting_notes_agent.config.core.exceptions import NotFoundError, ValidationError
+from meeting_notes_agent.database.models import TaskStatus, TaskPriority, TeamRole
+from meeting_notes_agent.config.core.exceptions import AuthorizationError, NotFoundError, ValidationError
 from meeting_notes_agent.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskListResponse
+from meeting_notes_agent.services.authorization_service import AuthorizationService
 
 
 class TaskService:
@@ -25,6 +26,13 @@ class TaskService:
         """Create a new task."""
         db = self._get_db()
         task_repo = TaskRepository(db)
+        authorization = AuthorizationService(db)
+        meeting = authorization.require_meeting_admin(data.meeting_id, user_id)
+        assigned_user = authorization.validate_task_assignee(
+            team_id=meeting.team_id,
+            project_id=meeting.project_id,
+            assigned_user_id=data.assigned_user_id,
+        )
 
         task = task_repo.create(
             user_id=user_id,
@@ -35,7 +43,8 @@ class TaskService:
             description=data.description,
             status=data.status,
             priority=data.priority,
-            assignee=data.assignee,
+            assignee=assigned_user.full_name if assigned_user else data.assignee,
+            assigned_user_id=data.assigned_user_id,
             due_date=data.due_date,
             labels=data.labels,
         )
@@ -49,9 +58,7 @@ class TaskService:
         db = self._get_db()
         task_repo = TaskRepository(db)
 
-        task = task_repo.get_by_id(task_id, user_id)
-        if not task:
-            raise NotFoundError("Task not found")
+        task = AuthorizationService(db).require_task_access(task_id, user_id)
         return TaskResponse.model_validate(task)
 
     def list_tasks(
@@ -61,6 +68,8 @@ class TaskService:
         page_size: int = 20,
         meeting_id: Optional[UUID] = None,
         status: Optional[TaskStatus] = None,
+        team_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
     ) -> TaskListResponse:
         """List user's tasks with optional filters."""
         db = self._get_db()
@@ -72,6 +81,8 @@ class TaskService:
             page_size=page_size,
             meeting_id=meeting_id,
             status=status,
+            team_id=team_id,
+            project_id=project_id,
         )
         return TaskListResponse(
             tasks=[TaskResponse.model_validate(t) for t in tasks],
@@ -85,11 +96,21 @@ class TaskService:
         db = self._get_db()
         task_repo = TaskRepository(db)
 
-        task = task_repo.get_by_id(task_id, user_id)
-        if not task:
-            raise NotFoundError("Task not found")
-
         update_data = data.model_dump(exclude_unset=True)
+        authorization = AuthorizationService(db)
+        task = authorization.require_task_access(task_id, user_id)
+        membership = authorization.require_team_member(task.team_id, user_id)
+        if membership.role not in {TeamRole.OWNER, TeamRole.ADMIN}:
+            if set(update_data) - {"status"}:
+                raise AuthorizationError("Members may update only task status")
+            task = authorization.require_task_status_access(task_id, user_id)
+        if "assigned_user_id" in update_data:
+            assigned_user = authorization.validate_task_assignee(
+                team_id=task.team_id,
+                project_id=task.project_id,
+                assigned_user_id=update_data["assigned_user_id"],
+            )
+            update_data["assignee"] = assigned_user.full_name if assigned_user else None
         task_repo.update(task, **update_data)
         db.commit()
         db.refresh(task)
@@ -101,9 +122,7 @@ class TaskService:
         db = self._get_db()
         task_repo = TaskRepository(db)
 
-        task = task_repo.get_by_id(task_id, user_id)
-        if not task:
-            raise NotFoundError("Task not found")
+        task = AuthorizationService(db).require_task_admin(task_id, user_id)
 
         task_repo.delete(task)
         db.commit()
@@ -113,9 +132,7 @@ class TaskService:
         db = self._get_db()
         task_repo = TaskRepository(db)
 
-        task = task_repo.get_by_id(task_id, user_id)
-        if not task:
-            raise NotFoundError("Task not found")
+        task = AuthorizationService(db).require_task_status_access(task_id, user_id)
 
         task_repo.update(task, status=TaskStatus.DONE)
         db.commit()

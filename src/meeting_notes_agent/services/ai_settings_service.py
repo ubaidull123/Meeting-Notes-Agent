@@ -65,6 +65,40 @@ class AISettingsService:
         self.db.flush()
         return credential
 
+    def apply_credential_as_default(self, user_id: int, provider: str) -> UserAIConfig:
+        """Use a saved personal AI credential for all future meeting processing.
+
+        Provider credentials are account-scoped. Selecting a provider here sets
+        the compatible LLM/transcription defaults once; projects and meetings do
+        not need their own provider configuration.
+        """
+        credential = self.get_credential(user_id, provider)
+        if credential is None:
+            raise ValidationError("Save the provider credential before selecting it.")
+
+        config = self.get_ai_config(user_id)
+        provider_type = ProviderType(provider)
+
+        if provider_supports(provider, "chat"):
+            models = get_available_models(provider, "chat")
+            config.llm_usage_mode = AIUsageMode.BYOK
+            config.llm_provider = provider_type
+            config.llm_credential_id = credential.id
+            if not validate_model(provider, "chat", config.llm_model):
+                config.llm_model = models[0]["id"] if models else None
+
+        if provider_supports(provider, "transcription"):
+            models = get_available_models(provider, "transcription")
+            config.transcription_usage_mode = AIUsageMode.BYOK
+            config.transcription_provider = provider_type
+            config.transcription_credential_id = credential.id
+            if not validate_model(provider, "transcription", config.transcription_model):
+                config.transcription_model = models[0]["id"] if models else None
+
+        config.updated_at = datetime.now(timezone.utc)
+        self.db.flush()
+        return config
+
     def delete_credential(self, user_id: int, provider: str) -> bool:
         credential = self.get_credential(user_id, provider)
         if not credential:

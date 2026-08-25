@@ -14,6 +14,7 @@ class TaskBase(BaseModel):
     status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
     assignee: Optional[str] = Field(default=None, max_length=255)
+    assigned_user_id: Optional[int] = None
     due_date: Optional[date] = None
     labels: List[str] = Field(default_factory=list)
 
@@ -32,6 +33,7 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
     priority: Optional[TaskPriority] = None
     assignee: Optional[str] = Field(default=None, max_length=255)
+    assigned_user_id: Optional[int] = None
     due_date: Optional[date] = None
     labels: Optional[List[str]] = None
 
@@ -40,6 +42,8 @@ class TaskResponse(TaskBase):
     """Task response schema."""
     id: str
     meeting_id: UUID
+    team_id: UUID
+    project_id: Optional[UUID]
     meeting_title: str
     action_item_index: int
     github_issue_number: Optional[int]

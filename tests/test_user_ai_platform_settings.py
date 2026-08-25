@@ -44,6 +44,13 @@ def test_settings_api_crud_masks_and_deletes_credentials(client, auth_headers, d
     assert body["api_key_hint"].endswith("abcd")
     assert "sk-test-secret" not in saved.text
 
+    defaults = client.get("/api/v1/settings/ai", headers=auth_headers)
+    assert defaults.status_code == 200
+    assert defaults.json()["llm_usage_mode"] == "byok"
+    assert defaults.json()["llm_provider"] == "openai"
+    assert defaults.json()["transcription_usage_mode"] == "byok"
+    assert defaults.json()["transcription_provider"] == "openai"
+
     stored = db_session.query(UserCredential).filter_by(user_id=test_user.id).first()
     assert stored is not None
     assert stored.api_key_encrypted != "sk-test-secret-abcd"
@@ -115,6 +122,8 @@ def test_byok_resolution_requires_key_and_does_not_spend_app_credits(db_session,
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="BYOK meeting",
         meeting_date=date.today(),
         transcript_text="Transcript",
@@ -140,6 +149,8 @@ def test_app_credit_processing_deducts_and_logs_usage(db_session, test_user):
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Credit meeting",
         meeting_date=date.today(),
         transcript_text="Transcript",
@@ -170,6 +181,8 @@ def test_insufficient_app_credits_blocks_cleanly(db_session, test_user):
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Blocked meeting",
         meeting_date=date.today(),
         transcript_text="Transcript",

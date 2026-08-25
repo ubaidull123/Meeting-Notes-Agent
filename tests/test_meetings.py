@@ -116,8 +116,8 @@ class TestMeetingCRUD:
         assert data["title"] == "Updated Title"
         assert data["project_name"] == "New Project"
 
-    def test_update_completed_meeting_metadata_and_attendees(self, client, auth_headers, db_session):
-        """Completed meetings remain editable without restarting the workflow."""
+    def test_update_completed_meeting_metadata_but_not_participants(self, client, auth_headers, db_session):
+        """Completed descriptive metadata stays editable while access relationships stay locked."""
         from meeting_notes_agent.database.models import Meeting, MeetingStatus
 
         create_resp = client.post("/api/v1/meetings", json={
@@ -134,7 +134,6 @@ class TestMeetingCRUD:
         response = client.patch(f"/api/v1/meetings/{meeting_id}", json={
             "title": "Corrected title",
             "notes": "Corrected notes",
-            "attendees": [{"name": "Alex Smith", "email": "alex@example.com"}],
         }, headers=auth_headers)
 
         assert response.status_code == 200
@@ -143,8 +142,13 @@ class TestMeetingCRUD:
         assert data["notes"] == "Corrected notes"
         assert data["status"] == "completed"
         assert [(item["name"], item["email"]) for item in data["attendees"]] == [
-            ("Alex Smith", "alex@example.com")
+            ("Jane", "jane@example.com")
         ]
+
+        participant_change = client.patch(f"/api/v1/meetings/{meeting_id}", json={
+            "attendees": [{"name": "Alex Smith", "email": "alex@example.com"}],
+        }, headers=auth_headers)
+        assert participant_change.status_code == 400
 
     def test_delete_meeting(self, client, auth_headers):
         """Test deleting a meeting."""
@@ -292,6 +296,8 @@ class TestMeetingOwnership:
         other_meeting = Meeting(
             id=uuid4(),
             user_id=admin_user.id,
+            team_id=admin_user.team_memberships[0].team_id,
+            created_by=admin_user.id,
             title="Other User's Meeting",
             meeting_date=date.today(),
             transcript_text="Other transcript",
@@ -314,6 +320,8 @@ class TestMeetingOwnership:
         other_meeting = Meeting(
             id=uuid4(),
             user_id=admin_user.id,
+            team_id=admin_user.team_memberships[0].team_id,
+            created_by=admin_user.id,
             title="Other User's Meeting",
             meeting_date=date.today(),
             transcript_text="Other transcript",

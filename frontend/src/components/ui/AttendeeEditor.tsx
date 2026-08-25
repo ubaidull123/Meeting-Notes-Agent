@@ -35,45 +35,45 @@ export const AttendeeEditor: React.FC<AttendeeEditorProps> = ({ attendees, onCha
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-          <Users className="w-4 h-4 text-teal-600" />
-          <span>Meeting Attendees</span>
+        <label className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+          <Users className="h-4 w-4 text-primary" />
+          <span>Meeting attendees</span>
           <span className="text-xs text-muted-foreground">({attendees.length})</span>
         </label>
         <button
           type="button"
           onClick={handleAdd}
-          className="inline-flex items-center gap-1 text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 transition-colors"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-primary transition-colors hover:underline"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Add Attendee</span>
+          <span>Add attendee</span>
         </button>
       </div>
 
       <div className="space-y-2">
         {attendees.map((attendee, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div key={index} className="flex items-start gap-2 rounded-lg border border-border/70 bg-muted/20 p-2.5">
+            <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
               <input
                 type="text"
                 placeholder="Full name (e.g. Alice Johnson)"
                 value={attendee.name}
                 onChange={(e) => handleUpdate(index, 'name', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-1 focus:ring-teal-500 placeholder:text-muted-foreground"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
               />
               <input
                 type="email"
                 placeholder="Email address (e.g. alice@company.com)"
                 value={attendee.email}
                 onChange={(e) => handleUpdate(index, 'email', e.target.value)}
-                className="w-full px-3 py-1.5 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-1 focus:ring-teal-500 placeholder:text-muted-foreground"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20 placeholder:text-muted-foreground"
               />
             </div>
             <button
               type="button"
               onClick={() => handleRemove(index)}
               disabled={attendees.length <= 1}
-              className="p-2 text-muted-foreground hover:text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-md hover:bg-muted transition-colors"
+              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30"
               title="Remove attendee"
             >
               <Trash2 className="w-4 h-4" />

@@ -40,22 +40,22 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="human-review-title">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => !isLoading && onClose()} />
+      <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-[2px]" onClick={() => !isLoading && onClose()} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border bg-card shadow-2xl z-10 animate-in fade-in zoom-in-95">
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in-95">
         {/* Header */}
-        <div className="p-5 border-b border-border flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-5">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
               <UserCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-foreground">Human-in-the-Loop Review</h2>
-              <p className="text-xs text-muted-foreground">
-                Review generated summary & action items before finalization
+              <h2 id="human-review-title" className="text-base font-semibold text-foreground">Review meeting output</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Approve, request a targeted revision, or reject this output.
               </p>
             </div>
           </div>
@@ -63,31 +63,32 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="text-muted-foreground hover:text-foreground p-1 rounded-md"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Close review"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
+        <div className="flex-1 space-y-4 overflow-y-auto p-4 text-sm sm:p-5">
           {/* Summary Preview */}
-          <div className="p-4 rounded-xl border bg-muted/30 space-y-2">
+          <div className="space-y-2 rounded-lg border border-border bg-muted/25 p-4">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Generated Summary
             </h4>
-            <p className="text-foreground text-xs leading-relaxed whitespace-pre-wrap">
+            <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/90">
               {reviewContent.redacted_summary || 'No summary generated yet.'}
             </p>
           </div>
 
           {/* Key Decisions */}
           {reviewContent.redacted_decisions && reviewContent.redacted_decisions.length > 0 && (
-            <div className="p-4 rounded-xl border bg-muted/30 space-y-2">
+            <div className="space-y-2 rounded-lg border border-border bg-muted/25 p-4">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Decisions ({reviewContent.redacted_decisions.length})
               </h4>
-              <ul className="list-disc list-inside space-y-1 text-xs text-foreground">
+              <ul className="list-inside list-disc space-y-1.5 text-sm leading-6 text-foreground/90">
                 {reviewContent.redacted_decisions.map((d, i) => (
                   <li key={i}>{d}</li>
                 ))}
@@ -97,11 +98,11 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
 
           {/* Action Items */}
           {reviewContent.redacted_action_items && reviewContent.redacted_action_items.length > 0 && (
-            <div className="p-4 rounded-xl border bg-muted/30 space-y-2">
+            <div className="space-y-2 rounded-lg border border-border bg-muted/25 p-4">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Extracted Action Items ({reviewContent.redacted_action_items.length})
               </h4>
-              <ul className="list-disc list-inside space-y-1 text-xs text-foreground">
+              <ul className="list-inside list-disc space-y-1.5 text-sm leading-6 text-foreground/90">
                 {reviewContent.redacted_action_items.map((a, i) => (
                   <li key={i}>{a}</li>
                 ))}
@@ -110,20 +111,20 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
           )}
 
           {/* Decision Form */}
-          <form onSubmit={handleSubmit} className="pt-3 border-t border-border space-y-3">
-            <label className="text-xs font-semibold text-foreground block">Select Review Decision</label>
-            <div className="grid grid-cols-3 gap-2.5">
+          <form onSubmit={handleSubmit} className="space-y-4 border-t border-border pt-4">
+            <label className="block text-sm font-semibold text-foreground">Review decision</label>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => setDecision('approve')}
                 className={cn(
-                  'flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all',
+                  'flex min-h-20 flex-row items-center justify-start gap-2 rounded-lg border p-3 text-left transition-all sm:flex-col sm:justify-center sm:text-center',
                   decision === 'approve'
                     ? 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200 font-semibold ring-2 ring-emerald-500/20'
                     : 'border-border hover:bg-muted text-muted-foreground'
                 )}
               >
-                <Check className="w-4 h-4 mb-1 text-emerald-600" />
+                <Check className="h-4 w-4 text-emerald-600" />
                 <span className="text-xs">Approve</span>
               </button>
 
@@ -131,13 +132,13 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
                 type="button"
                 onClick={() => setDecision('revise')}
                 className={cn(
-                  'flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all',
+                  'flex min-h-20 flex-row items-center justify-start gap-2 rounded-lg border p-3 text-left transition-all sm:flex-col sm:justify-center sm:text-center',
                   decision === 'revise'
                     ? 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200 font-semibold ring-2 ring-amber-500/20'
                     : 'border-border hover:bg-muted text-muted-foreground'
                 )}
               >
-                <RefreshCw className="w-4 h-4 mb-1 text-amber-600" />
+                <RefreshCw className="h-4 w-4 text-amber-600" />
                 <span className="text-xs">Request Revision</span>
               </button>
 
@@ -145,13 +146,13 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
                 type="button"
                 onClick={() => setDecision('reject')}
                 className={cn(
-                  'flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all',
+                  'flex min-h-20 flex-row items-center justify-start gap-2 rounded-lg border p-3 text-left transition-all sm:flex-col sm:justify-center sm:text-center',
                   decision === 'reject'
                     ? 'border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200 font-semibold ring-2 ring-rose-500/20'
                     : 'border-border hover:bg-muted text-muted-foreground'
                 )}
               >
-                <X className="w-4 h-4 mb-1 text-rose-600" />
+                <X className="h-4 w-4 text-rose-600" />
                 <span className="text-xs">Reject</span>
               </button>
             </div>
@@ -164,7 +165,7 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                   placeholder="e.g. Make summary more concise and re-word action item 2..."
-                  className="w-full p-2.5 text-xs bg-background border border-input rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-muted-foreground"
+                  className="w-full rounded-lg border border-input bg-background p-3 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 placeholder:text-muted-foreground"
                 />
               </div>
             )}
@@ -176,12 +177,12 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
               </div>
             )}
 
-            <div className="pt-3 flex items-center justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-end">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isLoading}
-                className="px-3.5 py-2 text-xs font-medium text-muted-foreground hover:bg-muted rounded-lg"
+                className="rounded-lg px-3.5 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted"
               >
                 Cancel
               </button>
@@ -189,7 +190,7 @@ export const HumanReviewModal: React.FC<HumanReviewModalProps> = ({
                 type="submit"
                 disabled={isLoading}
                 className={cn(
-                  'px-4 py-2 text-xs font-semibold text-white rounded-lg shadow-sm transition-all',
+                  'rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all',
                   decision === 'approve'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : decision === 'revise'

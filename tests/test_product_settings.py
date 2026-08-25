@@ -158,6 +158,8 @@ def test_meeting_defaults_persist_and_resolve_into_processing_state(
     meeting = Meeting(
         id=uuid4(),
         user_id=test_user.id,
+        team_id=test_user.team_memberships[0].team_id,
+        created_by=test_user.id,
         title="Configuration meeting",
         meeting_date=date.today(),
         transcript_text="Transcript",

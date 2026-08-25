@@ -4,7 +4,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 
-from meeting_notes_agent.database.models import UserRole, MeetingStatus
+from meeting_notes_agent.database.models import PlatformRole, UserRole, MeetingStatus
 
 
 class AdminStatsResponse(BaseModel):
@@ -50,6 +50,7 @@ class AdminUserListItem(BaseModel):
     email: str
     full_name: str
     role: UserRole
+    platform_role: PlatformRole
     is_active: bool
     created_at: datetime
     quota_limit: int
@@ -65,6 +66,7 @@ class AdminUserDetail(BaseModel):
     email: str
     full_name: str
     role: UserRole
+    platform_role: PlatformRole
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -80,6 +82,7 @@ class AdminUserUpdate(BaseModel):
     full_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     is_active: Optional[bool] = None
     role: Optional[UserRole] = None
+    platform_role: Optional[PlatformRole] = None
 
 
 class AdminMeetingListItem(BaseModel):

@@ -8,9 +8,9 @@ export const AppShell: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
+    <div className="flex min-h-screen bg-background text-foreground">
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex shrink-0">
+      <div className="hidden shrink-0 md:flex">
         <Sidebar
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -19,12 +19,13 @@ export const AppShell: React.FC = () => {
 
       {/* Mobile Sidebar Overlay / Drawer */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="fixed inset-0 z-50 flex md:hidden">
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-950/45 backdrop-blur-[2px] transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
           />
-          <div className="relative z-10 w-72 max-w-[80vw] h-full bg-card shadow-2xl flex flex-col">
+          <div className="relative z-10 flex h-full w-[17rem] max-w-[86vw] flex-col bg-card shadow-2xl">
             <Sidebar
               isCollapsed={false}
               onToggleCollapse={() => setIsMobileMenuOpen(false)}
@@ -35,10 +36,12 @@ export const AppShell: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
         <TopBar onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
-        <main className="flex-1 w-full max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
-          <Outlet />
+        <main className="w-full flex-1">
+          <div className="mx-auto w-full max-w-[1320px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

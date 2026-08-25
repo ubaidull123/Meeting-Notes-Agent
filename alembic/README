@@ -1,0 +1,4 @@
+Alembic manages the application schema from SQLAlchemy metadata.
+
+DATABASE_URL is required and is never stored in this directory. Set
+ALEMBIC_SCHEMA only for isolated PostgreSQL verification schemas.

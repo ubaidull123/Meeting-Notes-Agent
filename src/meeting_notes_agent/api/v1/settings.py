@@ -7,7 +7,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 
-from meeting_notes_agent.auth.dependencies import get_current_user_id
+from meeting_notes_agent.auth.dependencies import (
+    get_current_configuration_manager_id,
+    get_current_user_id,
+)
 from meeting_notes_agent.config.providers import PROVIDER_CATALOG
 from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import Meeting, UserUsage
@@ -43,6 +46,7 @@ from meeting_notes_agent.services.credits_service import CreditsService
 from meeting_notes_agent.services.email_settings_service import EmailSettingsService
 from meeting_notes_agent.services.meeting_override_service import MeetingOverrideService
 from meeting_notes_agent.services.product_settings_service import ProductSettingsService
+from meeting_notes_agent.services.authorization_service import AuthorizationService
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
 
@@ -79,12 +83,14 @@ def _credential_public(credential, service: AISettingsService | None = None) -> 
 
 
 @router.get("/providers")
-async def providers():
+async def providers(
+    _current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)],
+):
     return PROVIDER_CATALOG
 
 
 @router.get("/ai", response_model=AISettingsResponse)
-async def get_ai_settings(current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
+async def get_ai_settings(current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
     service = AISettingsService(db)
     config = service.get_ai_config(current_user_id)
     advanced = ProductSettingsService(db).get_ai_advanced(current_user_id)
@@ -101,7 +107,7 @@ async def get_ai_settings(current_user_id: Annotated[int, Depends(get_current_us
 
 
 @router.put("/ai", response_model=AISettingsResponse)
-async def update_ai_settings(data: AISettingsUpdate, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
+async def update_ai_settings(data: AISettingsUpdate, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
     service = AISettingsService(db)
     values = data.model_dump()
     advanced = {
@@ -117,7 +123,7 @@ async def update_ai_settings(data: AISettingsUpdate, current_user_id: Annotated[
 
 @router.get("/transcription", response_model=TranscriptionSettingsResponse)
 async def get_transcription_settings(
-    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)],
     db=Depends(get_db),
 ):
     service = AISettingsService(db)
@@ -135,7 +141,7 @@ async def get_transcription_settings(
 @router.put("/transcription", response_model=TranscriptionSettingsResponse)
 async def update_transcription_settings(
     data: TranscriptionSettingsUpdate,
-    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)],
     db=Depends(get_db),
 ):
     ai_service = AISettingsService(db)
@@ -159,7 +165,7 @@ async def update_transcription_settings(
 
 @router.get("/meetings", response_model=MeetingDefaultsResponse)
 async def get_meeting_defaults(
-    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)],
     db=Depends(get_db),
 ):
     return ProductSettingsService(db).get_meeting_defaults(current_user_id)
@@ -168,7 +174,7 @@ async def get_meeting_defaults(
 @router.put("/meetings", response_model=MeetingDefaultsResponse)
 async def update_meeting_defaults(
     data: MeetingDefaultsUpdate,
-    current_user_id: Annotated[int, Depends(get_current_user_id)],
+    current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)],
     db=Depends(get_db),
 ):
     result = ProductSettingsService(db).update_meeting_defaults(current_user_id, **data.model_dump())
@@ -215,33 +221,35 @@ async def update_privacy_settings(
 
 
 @router.get("/credentials", response_model=list[CredentialPublic])
-async def list_credentials(current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
+async def list_credentials(current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
     service = AISettingsService(db)
     return [_credential_public(c, service) for c in service.list_credentials(current_user_id)]
 
 
 @router.post("/credentials", response_model=CredentialPublic, status_code=status.HTTP_201_CREATED)
-async def save_credential(data: CredentialSaveRequest, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
-    credential = AISettingsService(db).save_credential(current_user_id, data.provider, data.api_key, data.config)
+async def save_credential(data: CredentialSaveRequest, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
+    service = AISettingsService(db)
+    credential = service.save_credential(current_user_id, data.provider, data.api_key, data.config)
+    service.apply_credential_as_default(current_user_id, data.provider)
     db.commit()
-    return _credential_public(credential, AISettingsService(db))
+    return _credential_public(credential, service)
 
 
 @router.delete("/credentials/{provider}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_credential(provider: str, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
+async def delete_credential(provider: str, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
     AISettingsService(db).delete_credential(current_user_id, provider)
     db.commit()
 
 
 @router.post("/credentials/test", response_model=CredentialTestResponse)
-async def test_credential(data: CredentialTestRequest, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
+async def test_credential(data: CredentialTestRequest, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
     result = AISettingsService(db).test_credential(data.provider, data.api_key, current_user_id, data.config)
     db.commit()
     return CredentialTestResponse(**result)
 
 
 @router.get("/email", response_model=EmailSettingsResponse)
-async def get_email_settings(current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
+async def get_email_settings(current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
     config = EmailSettingsService(db).get_email_config(current_user_id)
     domain = config.sender_email.rsplit("@", 1)[-1] if config.sender_email and "@" in config.sender_email else None
     return EmailSettingsResponse(
@@ -260,7 +268,7 @@ async def get_email_settings(current_user_id: Annotated[int, Depends(get_current
 
 
 @router.put("/email", response_model=EmailSettingsResponse)
-async def update_email_settings(data: EmailSettingsUpdate, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
+async def update_email_settings(data: EmailSettingsUpdate, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
     EmailSettingsService(db).update_email_config(current_user_id, **data.model_dump())
     db.commit()
     return await get_email_settings(current_user_id, db)
@@ -315,18 +323,21 @@ async def usage_summary(
 
 
 @router.get("/meetings/{meeting_id}/override", response_model=MeetingOverrideResponse)
-async def get_override(meeting_id: UUID, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
-    return MeetingOverrideService(db).to_dict(meeting_id, current_user_id) or {}
+async def get_override(meeting_id: UUID, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
+    meeting = AuthorizationService(db).require_meeting_admin(meeting_id, current_user_id)
+    return MeetingOverrideService(db).to_dict(meeting_id, meeting.user_id) or {}
 
 
 @router.put("/meetings/{meeting_id}/override", response_model=MeetingOverrideResponse)
-async def set_override(meeting_id: UUID, data: MeetingOverrideRequest, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
-    MeetingOverrideService(db).set_override(meeting_id, current_user_id, **data.model_dump())
+async def set_override(meeting_id: UUID, data: MeetingOverrideRequest, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
+    meeting = AuthorizationService(db).require_meeting_admin(meeting_id, current_user_id)
+    MeetingOverrideService(db).set_override(meeting_id, meeting.user_id, **data.model_dump())
     db.commit()
-    return MeetingOverrideService(db).to_dict(meeting_id, current_user_id) or {}
+    return MeetingOverrideService(db).to_dict(meeting_id, meeting.user_id) or {}
 
 
 @router.delete("/meetings/{meeting_id}/override", status_code=status.HTTP_204_NO_CONTENT)
-async def clear_override(meeting_id: UUID, current_user_id: Annotated[int, Depends(get_current_user_id)], db=Depends(get_db)):
-    MeetingOverrideService(db).clear_override(meeting_id, current_user_id)
+async def clear_override(meeting_id: UUID, current_user_id: Annotated[int, Depends(get_current_configuration_manager_id)], db=Depends(get_db)):
+    meeting = AuthorizationService(db).require_meeting_admin(meeting_id, current_user_id)
+    MeetingOverrideService(db).clear_override(meeting_id, meeting.user_id)
     db.commit()

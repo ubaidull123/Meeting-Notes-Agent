@@ -4,7 +4,7 @@ from typing import Optional, List, Tuple
 import uuid
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, desc, and_, or_
+from sqlalchemy import func, desc, and_, or_, exists
 
 from meeting_notes_agent.database.models import (
     User,
@@ -18,6 +18,9 @@ from meeting_notes_agent.database.models import (
     MeetingStatus,
     TaskStatus,
     TaskPriority,
+    ProjectMembership,
+    TeamMembership,
+    TeamRole,
 )
 from meeting_notes_agent.config.core.exceptions import NotFoundError, ConflictError
 
@@ -258,10 +261,43 @@ class MeetingRepository:
         return meeting
 
     def get_by_id(self, meeting_id: UUID, user_id: Optional[int] = None) -> Optional[Meeting]:
-        """Get meeting by ID, optionally filtered by user."""
+        """Get a meeting only when the user has team/project access."""
         query = self.db.query(Meeting).filter(Meeting.id == meeting_id)
         if user_id is not None:
-            query = query.filter(Meeting.user_id == user_id)
+            query = (
+                query.join(
+                    TeamMembership,
+                    TeamMembership.team_id == Meeting.team_id,
+                )
+                .outerjoin(
+                    ProjectMembership,
+                    and_(
+                        ProjectMembership.project_id == Meeting.project_id,
+                        ProjectMembership.user_id == user_id,
+                    ),
+                )
+                .filter(
+                    TeamMembership.user_id == user_id,
+                    or_(
+                        TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
+                        and_(
+                            or_(
+                                Meeting.project_id.is_(None),
+                                ProjectMembership.id.isnot(None),
+                            ),
+                            or_(
+                                Meeting.restrict_to_participants.is_(False),
+                                exists().where(
+                                    and_(
+                                        Attendee.meeting_id == Meeting.id,
+                                        Attendee.user_id == user_id,
+                                    )
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            )
         return query.first()
 
     def get_by_thread_id(self, thread_id: str) -> Optional[Meeting]:
@@ -274,11 +310,48 @@ class MeetingRepository:
         page: int = 1,
         page_size: int = 20,
         status: Optional[MeetingStatus] = None,
+        team_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
     ) -> Tuple[List[Meeting], int]:
-        """Get user's meetings with pagination."""
-        query = self.db.query(Meeting).filter(Meeting.user_id == user_id)
+        """Get meetings visible through team and project membership."""
+        query = (
+            self.db.query(Meeting)
+            .join(TeamMembership, TeamMembership.team_id == Meeting.team_id)
+            .outerjoin(
+                ProjectMembership,
+                and_(
+                    ProjectMembership.project_id == Meeting.project_id,
+                    ProjectMembership.user_id == user_id,
+                ),
+            )
+            .filter(
+                TeamMembership.user_id == user_id,
+                or_(
+                    TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
+                    and_(
+                        or_(
+                            Meeting.project_id.is_(None),
+                            ProjectMembership.id.isnot(None),
+                        ),
+                        or_(
+                            Meeting.restrict_to_participants.is_(False),
+                            exists().where(
+                                and_(
+                                    Attendee.meeting_id == Meeting.id,
+                                    Attendee.user_id == user_id,
+                                )
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        )
         if status:
             query = query.filter(Meeting.status == status)
+        if team_id:
+            query = query.filter(Meeting.team_id == team_id)
+        if project_id:
+            query = query.filter(Meeting.project_id == project_id)
         total = query.count()
         meetings = query.order_by(desc(Meeting.created_at)).offset((page - 1) * page_size).limit(page_size).all()
         return meetings, total
@@ -383,7 +456,14 @@ class AttendeeRepository:
     def create_batch(self, meeting_id: UUID, attendees: List[dict]) -> List[Attendee]:
         """Create multiple attendees for a meeting."""
         attendee_objects = [
-            Attendee(meeting_id=meeting_id, name=a["name"], email=a["email"])
+            Attendee(
+                meeting_id=meeting_id,
+                user_id=a.get("user_id"),
+                name=a["name"],
+                email=a["email"],
+                title=a.get("title"),
+                department=a.get("department"),
+            )
             for a in attendees
         ]
         self.db.add_all(attendee_objects)
@@ -417,20 +497,21 @@ class TaskRepository:
         status: TaskStatus = TaskStatus.TODO,
         priority: TaskPriority = TaskPriority.MEDIUM,
         assignee: Optional[str] = None,
+        assigned_user_id: Optional[int] = None,
         due_date: Optional[date] = None,
         labels: Optional[List[str]] = None,
     ) -> Task:
         """Create a task for a meeting owned by the user."""
-        meeting = self.db.query(Meeting).filter(
-            Meeting.id == meeting_id,
-            Meeting.user_id == user_id,
-        ).first()
+        meeting = self.db.query(Meeting).filter(Meeting.id == meeting_id).first()
         if not meeting:
             raise NotFoundError("Meeting not found")
 
         task = Task(
             id=str(uuid.uuid4())[:8],
             meeting_id=meeting_id,
+            team_id=meeting.team_id,
+            project_id=meeting.project_id,
+            assigned_user_id=assigned_user_id,
             meeting_title=meeting_title,
             action_item_index=action_item_index,
             title=title,
@@ -452,17 +533,57 @@ class TaskRepository:
         return tasks
 
     def get_by_id(self, task_id: str, user_id: Optional[int] = None) -> Optional[Task]:
-        """Get task by ID, optionally filtered by user (via meeting)."""
+        """Get a task only when team/project/assignment access permits it."""
         query = self.db.query(Task).filter(Task.id == task_id)
         if user_id is not None:
-            query = query.join(Meeting).filter(Meeting.user_id == user_id)
+            query = (
+                query.join(
+                    TeamMembership,
+                    TeamMembership.team_id == Task.team_id,
+                )
+                .outerjoin(
+                    ProjectMembership,
+                    and_(
+                        ProjectMembership.project_id == Task.project_id,
+                        ProjectMembership.user_id == user_id,
+                    ),
+                )
+                .filter(
+                    TeamMembership.user_id == user_id,
+                    or_(
+                        TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
+                        Task.assigned_user_id == user_id,
+                        ProjectMembership.id.isnot(None),
+                    ),
+                )
+            )
         return query.first()
 
     def get_by_meeting_id(self, meeting_id: UUID, user_id: Optional[int] = None) -> List[Task]:
         """Get all tasks for a meeting."""
         query = self.db.query(Task).filter(Task.meeting_id == meeting_id)
         if user_id is not None:
-            query = query.join(Meeting).filter(Meeting.user_id == user_id)
+            query = (
+                query.join(
+                    TeamMembership,
+                    TeamMembership.team_id == Task.team_id,
+                )
+                .outerjoin(
+                    ProjectMembership,
+                    and_(
+                        ProjectMembership.project_id == Task.project_id,
+                        ProjectMembership.user_id == user_id,
+                    ),
+                )
+                .filter(
+                    TeamMembership.user_id == user_id,
+                    or_(
+                        TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
+                        Task.assigned_user_id == user_id,
+                        ProjectMembership.id.isnot(None),
+                    ),
+                )
+            )
         return query.all()
 
     def get_by_meeting_and_action_item(self, meeting_id: UUID, action_item_index: int) -> Optional[Task]:
@@ -479,13 +600,37 @@ class TaskRepository:
         page_size: int = 20,
         meeting_id: Optional[UUID] = None,
         status: Optional[TaskStatus] = None,
+        team_id: Optional[UUID] = None,
+        project_id: Optional[UUID] = None,
     ) -> Tuple[List[Task], int]:
         """Get user's tasks with pagination."""
-        query = self.db.query(Task).join(Meeting).filter(Meeting.user_id == user_id)
+        query = (
+            self.db.query(Task)
+            .join(TeamMembership, TeamMembership.team_id == Task.team_id)
+            .outerjoin(
+                ProjectMembership,
+                and_(
+                    ProjectMembership.project_id == Task.project_id,
+                    ProjectMembership.user_id == user_id,
+                ),
+            )
+            .filter(
+                TeamMembership.user_id == user_id,
+                or_(
+                    TeamMembership.role.in_([TeamRole.OWNER, TeamRole.ADMIN]),
+                    Task.assigned_user_id == user_id,
+                    ProjectMembership.id.isnot(None),
+                ),
+            )
+        )
         if meeting_id:
             query = query.filter(Task.meeting_id == meeting_id)
         if status:
             query = query.filter(Task.status == status)
+        if team_id:
+            query = query.filter(Task.team_id == team_id)
+        if project_id:
+            query = query.filter(Task.project_id == project_id)
         total = query.count()
         tasks = query.order_by(desc(Task.created_at)).offset((page - 1) * page_size).limit(page_size).all()
         return tasks, total

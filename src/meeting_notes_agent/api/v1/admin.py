@@ -5,6 +5,7 @@ from uuid import UUID
 from datetime import datetime
 
 from meeting_notes_agent.auth.dependencies import get_current_user, require_admin
+from meeting_notes_agent.database import get_db
 from meeting_notes_agent.database.models import User, MeetingStatus
 from meeting_notes_agent.schemas.admin import (
     AdminStatsResponse,
@@ -24,9 +25,10 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 @router.get("/stats", response_model=AdminStatsResponse)
 async def get_stats(
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Get admin dashboard statistics."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     return admin_service.get_stats()
 
 
@@ -38,12 +40,13 @@ async def list_users(
     search: Optional[str] = None,
     role: Optional[str] = None,
     is_active: Optional[bool] = None,
+    db=Depends(get_db),
 ):
     """List all users (admin)."""
     from meeting_notes_agent.database.models import UserRole
     role_enum = UserRole(role) if role else None
 
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     users, total = admin_service.list_users(
         page=page,
         page_size=page_size,
@@ -58,9 +61,10 @@ async def list_users(
 async def get_user(
     user_id: int,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Get user detail (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.get_user(user_id)
     except NotFoundError as e:
@@ -72,9 +76,10 @@ async def update_user(
     user_id: int,
     _admin: Annotated[User, Depends(require_admin)],
     data: AdminUserUpdate,
+    db=Depends(get_db),
 ):
     """Update user (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.update_user(user_id, data)
     except NotFoundError as e:
@@ -87,9 +92,10 @@ async def update_user(
 async def delete_user(
     user_id: int,
     admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Delete user (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         admin_service.delete_user(user_id, current_admin_id=admin.id)
     except NotFoundError as e:
@@ -104,9 +110,10 @@ async def adjust_user_credits(
     _admin: Annotated[User, Depends(require_admin)],
     amount: int,
     reason: str,
+    db=Depends(get_db),
 ):
     """Adjust user credits (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.adjust_credits(user_id, amount, reason)
     except NotFoundError as e:
@@ -120,9 +127,10 @@ async def adjust_user_quota(
     user_id: int,
     _admin: Annotated[User, Depends(require_admin)],
     monthly_limit: int,
+    db=Depends(get_db),
 ):
     """Adjust user quota (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.adjust_quota(user_id, monthly_limit)
     except NotFoundError as e:
@@ -140,11 +148,12 @@ async def list_meetings(
     user_id: Optional[int] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
+    db=Depends(get_db),
 ):
     """List all meetings (admin)."""
     status_enum = MeetingStatus(status) if status else None
 
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     meetings, total = admin_service.list_meetings(
         page=page,
         page_size=page_size,
@@ -160,9 +169,10 @@ async def list_meetings(
 async def get_meeting_status(
     meeting_id: UUID,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Get meeting status (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         return admin_service.get_meeting_status(meeting_id)
     except NotFoundError as e:
@@ -173,9 +183,10 @@ async def get_meeting_status(
 async def cancel_meeting(
     meeting_id: UUID,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Cancel meeting (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         admin_service.cancel_meeting(meeting_id)
     except NotFoundError as e:
@@ -188,9 +199,10 @@ async def cancel_meeting(
 async def retry_meeting(
     meeting_id: UUID,
     _admin: Annotated[User, Depends(require_admin)],
+    db=Depends(get_db),
 ):
     """Retry failed meeting (admin)."""
-    admin_service = AdminService()
+    admin_service = AdminService(db)
     try:
         admin_service.retry_meeting(meeting_id)
     except NotFoundError as e:

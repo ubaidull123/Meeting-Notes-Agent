@@ -2,7 +2,7 @@
 import json
 from typing import Optional, List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, field_validator
 
 
 class Settings(BaseSettings):
@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(alias="DATABASE_URL")
+    database_pool_size: int = Field(default=3, ge=1, alias="DATABASE_POOL_SIZE")
+    database_max_overflow: int = Field(default=2, ge=0, alias="DATABASE_MAX_OVERFLOW")
     postgres_host: str = Field(default="localhost", alias="POSTGRES_HOST")
     postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")
     postgres_db: str = Field(default="meeting_notes", alias="POSTGRES_DB")
@@ -66,6 +68,10 @@ class Settings(BaseSettings):
     # API Server
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
+    frontend_app_url: str = Field(
+        default="http://localhost:5173",
+        alias="FRONTEND_APP_URL",
+    )
 
     # File Upload
     max_upload_size_mb: int = Field(default=100, alias="MAX_UPLOAD_SIZE_MB")
@@ -82,6 +88,14 @@ class Settings(BaseSettings):
         default="dev-master-key-change-in-production-32bytes",
         alias="CREDENTIAL_ENCRYPTION_KEY"
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: object) -> object:
+        """Normalize Heroku's legacy PostgreSQL URL scheme for SQLAlchemy."""
+        if isinstance(value, str) and value.startswith("postgres://"):
+            return "postgresql://" + value.removeprefix("postgres://")
+        return value
 
     @computed_field
     @property

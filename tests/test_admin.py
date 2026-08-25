@@ -93,7 +93,8 @@ class TestAdminEndpoints:
         assert response.status_code == 204
         db_session.expire_all()
         from meeting_notes_agent.database.models import User
-        assert db_session.query(User).filter(User.id == user_id).first() is None
+        disabled_user = db_session.query(User).filter(User.id == user_id).one()
+        assert disabled_user.is_active is False
 
     def test_admin_cannot_delete_self(self, client, admin_headers, admin_user):
         """Test admin cannot remove their own account."""

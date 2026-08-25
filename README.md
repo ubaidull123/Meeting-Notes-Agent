@@ -442,6 +442,8 @@ Install in editable mode: `pip install -e .` or `uv sync`
 
 ### Audio transcription fails
 - Ensure ffmpeg is installed (required for audio processing)
+- On Heroku, install `https://github.com/heroku/heroku-buildpack-activestorage-preview.git`
+  before the Python buildpack so long recordings can be split automatically.
 - Check file format: MP3, WAV, M4A only
 - File size limit: ~100 MB
 

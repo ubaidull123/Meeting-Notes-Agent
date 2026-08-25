@@ -277,6 +277,7 @@ def send_meeting_summary_email(
     api_key_override: Optional[str] = None,
     provider_config: Optional[Dict[str, str]] = None,
     reply_to: Optional[str] = None,
+    meeting_url: Optional[str] = None,
 ) -> Any:
     """
     Send a formatted meeting summary email.
@@ -310,6 +311,12 @@ def send_meeting_summary_email(
         html_parts.append("<ul>")
         html_parts.extend(f"<li>{escape(a)}</li>" for a in action_items)
         html_parts.append("</ul>")
+
+    if meeting_url:
+        safe_url = escape(meeting_url, quote=True)
+        html_parts.append(
+            f'<p><a href="{safe_url}">View full meeting details</a></p>'
+        )
 
     html_content = "\n".join(html_parts)
 

@@ -4,6 +4,9 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export interface Task {
   id: string; // 8-character string
   meeting_id: string;
+  team_id: string;
+  project_id?: string | null;
+  assigned_user_id?: number | null;
   meeting_title: string;
   title: string;
   description?: string | null;
@@ -26,6 +29,7 @@ export interface TaskCreateRequest {
   status?: TaskStatus;
   priority?: TaskPriority;
   assignee?: string | null;
+  assigned_user_id?: number | null;
   due_date?: string | null;
   labels?: string[];
   meeting_id: string;
@@ -39,6 +43,7 @@ export interface TaskUpdateRequest {
   status?: TaskStatus;
   priority?: TaskPriority;
   assignee?: string | null;
+  assigned_user_id?: number | null;
   due_date?: string | null;
   labels?: string[];
 }

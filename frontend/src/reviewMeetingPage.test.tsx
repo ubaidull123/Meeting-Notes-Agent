@@ -8,6 +8,8 @@ import { meetingsApi } from './api/meetings';
 import { MeetingReviewPage, shouldPollMeetingStatus } from './reviewMeetingPage';
 import { Meeting } from './types/meeting';
 
+const roleState = vi.hoisted(() => ({ canManage: true }));
+
 vi.mock('./api/meetings', () => ({
   meetingsApi: {
     getMeeting: vi.fn(),
@@ -23,11 +25,39 @@ vi.mock('./api/meetings', () => ({
   },
 }));
 
+vi.mock('./api/teams', () => ({
+  projectsApi: { listMembers: vi.fn().mockResolvedValue([]) },
+  teamsApi: { listMembers: vi.fn().mockResolvedValue([]) },
+}));
+
+vi.mock('./context/TeamContext', () => ({
+  useTeam: () => ({
+    activeTeam: { id: 'team-1', role: 'owner' },
+    canManageTeam: () => roleState.canManage,
+  }),
+}));
+
+vi.mock('./context/AuthContext', () => ({
+  useAuth: () => ({
+    user: {
+      id: 1,
+      email: 'owner@example.com',
+      full_name: 'Team Owner',
+      role: 'USER',
+      platform_role: 'user',
+      is_active: true,
+    },
+  }),
+}));
+
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const meeting = {
   id: 'meeting-1',
   user_id: 1,
+  team_id: 'team-1',
+  project_id: 'project-1',
+  created_by: 1,
   title: 'Planning review',
   meeting_date: '2026-08-20',
   project_name: 'Launch',
@@ -61,6 +91,7 @@ function renderPage() {
 
 describe('MeetingReviewPage', () => {
   beforeEach(() => {
+    roleState.canManage = true;
     vi.mocked(meetingsApi.getMeeting).mockResolvedValue(meeting);
     vi.mocked(meetingsApi.getStatus).mockResolvedValue({
       meeting_id: meeting.id,
@@ -103,6 +134,52 @@ describe('MeetingReviewPage', () => {
 
     expect(await screen.findByRole('heading', { name: /email draft review/i })).toBeInTheDocument();
     expect(screen.getByText(/approved next steps/i)).toBeInTheDocument();
+  });
+
+  it('submits only the recipients selected for this meeting', async () => {
+    const user = userEvent.setup();
+    vi.mocked(meetingsApi.getEmailDraft).mockResolvedValue({
+      meeting_id: meeting.id,
+      meeting_title: meeting.title,
+      email_draft: 'Hello team,\n\nHere are the approved next steps.',
+      delivery_error: null,
+      redacted_summary: 'Approved summary',
+      redacted_decisions: [],
+      redacted_action_items: [],
+      participants: [
+        { user_id: 1, name: 'Team Owner', email: 'owner@example.com', selected: true },
+        { user_id: 2, name: 'Ali Khan', email: 'ali@example.com', title: 'Backend Developer', selected: false },
+      ],
+    });
+    vi.mocked(meetingsApi.submitEmailReview).mockResolvedValue({
+      meeting_id: meeting.id,
+      sent: true,
+      response: { status: 'sent' },
+      message: 'Email sent.',
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /review email/i }));
+    await user.click(await screen.findByRole('checkbox', { name: /ali khan/i }));
+    await user.click(screen.getByRole('button', { name: /send email/i }));
+
+    await waitFor(() => expect(meetingsApi.submitEmailReview).toHaveBeenCalledWith(
+      meeting.id,
+      expect.objectContaining({ recipient_user_ids: [1, 2] }),
+    ));
+  });
+
+  it('does not expose meeting-management controls to a normal member', async () => {
+    roleState.canManage = false;
+    renderPage();
+
+    expect(await screen.findByText('Planning review')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^edit meeting$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /review email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /stop processing/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /transcript/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /activity/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI & transcription configuration/i)).not.toBeInTheDocument();
   });
 
   it('confirms and submits a stop-processing request', async () => {

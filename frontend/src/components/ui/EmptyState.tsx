@@ -26,20 +26,20 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-xl border border-dashed border-border bg-card/50',
+        'flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/60 px-5 py-8 text-center',
         className
       )}
     >
-      <div className="p-3.5 rounded-full bg-muted text-muted-foreground mb-4">
-        <Icon className="w-6 h-6" />
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground shadow-sm">
+        <Icon className="h-5 w-5" />
       </div>
       <h3 className="text-base font-semibold text-foreground">{title}</h3>
-      <p className="mt-1.5 text-sm text-muted-foreground max-w-sm">{description}</p>
+      <p className="mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">{description}</p>
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-5 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+          className="mt-5 inline-flex min-h-9 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
         >
           {ActionIcon && <ActionIcon className="w-4 h-4" />}
           <span>{action.label}</span>

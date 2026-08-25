@@ -19,6 +19,8 @@ export interface ListMeetingsParams {
   page?: number;
   page_size?: number;
   status?: MeetingStatus;
+  team_id?: string;
+  project_id?: string;
 }
 
 export const meetingsApi = {

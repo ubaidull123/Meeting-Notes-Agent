@@ -10,9 +10,9 @@ import {
   Laptop,
   LogOut,
   User,
-  Settings,
   Shield,
   CreditCard,
+  ChevronDown,
 } from 'lucide-react';
 
 interface TopBarProps {
@@ -53,6 +53,10 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
     if (path === '/meetings/new') return { parent: { label: 'Meetings', path: '/meetings' }, label: 'Create meeting' };
     if (path.startsWith('/meetings/')) return { parent: { label: 'Meetings', path: '/meetings' }, label: 'Meeting details' };
     if (path === '/tasks') return { label: 'Tasks' };
+    if (path === '/projects') return { label: 'Projects' };
+    if (path.startsWith('/projects/')) return { parent: { label: 'Projects', path: '/projects' }, label: 'Project details' };
+    if (path === '/members') return { label: 'Team members' };
+    if (path === '/team-settings') return { label: 'Team settings' };
     if (path === '/usage') return { parent: { label: 'Settings', path: '/settings/profile' }, label: 'Usage & credits' };
     if (path.startsWith('/settings')) return { label: 'Settings' };
     if (path === '/admin') return { label: 'Admin dashboard' };
@@ -70,33 +74,33 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
 
   return (
     <>
-      <header className="h-16 border-b border-border bg-card/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/80 bg-card/90 px-4 backdrop-blur-md sm:px-6">
         {/* Left Side: Mobile Menu Button & Page Title */}
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onOpenMobileMenu}
-            className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="-ml-2 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
             title="Open menu"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm sm:text-base">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
             {pageContext.parent && <>
               <Link className="font-medium text-muted-foreground transition-colors hover:text-foreground" to={pageContext.parent.path}>{pageContext.parent.label}</Link>
               <span className="text-muted-foreground/60" aria-hidden="true">/</span>
             </>}
-            <span className="truncate font-semibold text-foreground">{pageContext.label}</span>
+            <span className="truncate font-semibold tracking-tight text-foreground">{pageContext.label}</span>
           </nav>
         </div>
 
         {/* Right Side: Usage pill, Theme toggle, User profile */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Quick credits indicator */}
           {profile?.credits && (
             <div
               onClick={() => navigate('/settings/usage')}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-full cursor-pointer hover:opacity-90 transition-opacity"
+              className="hidden items-center gap-1.5 rounded-md border border-primary/15 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-primary transition-colors hover:bg-primary/15 sm:flex"
               title="Available Credits"
             >
               <CreditCard className="w-3.5 h-3.5" />
@@ -109,7 +113,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
             <button
               type="button"
               onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               title="Switch theme"
             >
               {theme === 'dark' ? (
@@ -165,19 +169,20 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
             <button
               type="button"
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted transition-colors focus:outline-none"
+              className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-1.5 transition-colors hover:bg-muted"
             >
-              <div className="w-7 h-7 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs font-semibold">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary">
                 {user?.full_name?.charAt(0).toUpperCase() || 'U'}
               </div>
               <span className="hidden sm:inline text-xs font-medium text-foreground max-w-[120px] truncate">
                 {user?.full_name || 'Account'}
               </span>
+              <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground sm:block" />
             </button>
 
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl border bg-card p-2 shadow-xl z-50 animate-in fade-in zoom-in-95">
-                <div className="px-3 py-2 border-b border-border mb-1">
+              <div className="absolute right-0 z-50 mt-2 w-60 rounded-xl border border-border/80 bg-card p-2 shadow-xl animate-in fade-in zoom-in-95">
+                <div className="mb-1 border-b border-border px-3 py-2.5">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-foreground truncate">{user?.full_name}</p>
                     {isAdmin && (
@@ -186,17 +191,17 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{user?.email}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{user?.email}</p>
                 </div>
 
-                <div className="space-y-0.5 text-xs">
+                <div className="space-y-0.5 text-sm">
                   <button
                     type="button"
                     onClick={() => {
                       setIsUserMenuOpen(false);
                       navigate('/settings/profile');
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-foreground hover:bg-muted transition-colors text-left"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-foreground transition-colors hover:bg-muted"
                   >
                     <User className="w-4 h-4 text-muted-foreground" />
                     <span>My Profile</span>
@@ -208,7 +213,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
                       setIsUserMenuOpen(false);
                       navigate('/settings/usage');
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-foreground hover:bg-muted transition-colors text-left"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-foreground transition-colors hover:bg-muted"
                   >
                     <CreditCard className="w-4 h-4 text-muted-foreground" />
                     <span>Usage & Credits</span>
@@ -227,18 +232,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
                       <span>Admin Center</span>
                     </button>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      navigate('/settings/ai');
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-foreground hover:bg-muted transition-colors text-left"
-                  >
-                    <Settings className="w-4 h-4 text-muted-foreground" />
-                    <span>Settings</span>
-                  </button>
 
                   <div className="pt-1 border-t border-border mt-1">
                     <button
